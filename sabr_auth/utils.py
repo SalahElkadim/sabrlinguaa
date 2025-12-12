@@ -251,3 +251,133 @@ def send_password_reset_confirmation_email(user):
     except Exception as e:
         print(f"Error sending email: {str(e)}")
         return False
+
+def send_verification_email(user, code):
+    """
+    Send verification code email to user
+    """
+    subject = 'تأكيد البريد الإلكتروني - Sabr Learning Platform'
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: 'Arial', sans-serif;
+                background-color: #f4f4f4;
+                margin: 0;
+                padding: 0;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 20px auto;
+                background-color: #ffffff;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            .header {{
+                background-color: #4CAF50;
+                color: white;
+                padding: 30px;
+                text-align: center;
+            }}
+            .content {{
+                padding: 40px 30px;
+                text-align: right;
+            }}
+            .code-box {{
+                background-color: #f8f9fa;
+                border: 2px dashed #4CAF50;
+                padding: 20px;
+                margin: 30px 0;
+                text-align: center;
+                border-radius: 8px;
+            }}
+            .code {{
+                font-size: 36px;
+                font-weight: bold;
+                color: #4CAF50;
+                letter-spacing: 10px;
+                font-family: 'Courier New', monospace;
+            }}
+            .warning {{
+                background-color: #fff3cd;
+                border-right: 4px solid #ffc107;
+                padding: 15px;
+                margin: 20px 0;
+                color: #856404;
+            }}
+            .footer {{
+                background-color: #f8f8f8;
+                padding: 20px;
+                text-align: center;
+                color: #999;
+                font-size: 12px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>تأكيد البريد الإلكتروني</h1>
+            </div>
+            <div class="content">
+                <h2>مرحباً {user.full_name}،</h2>
+                <p>
+                    شكراً لتسجيلك في منصة Sabr للتعلم!
+                </p>
+                <p>
+                    لإكمال عملية التسجيل، يرجى استخدام رمز التحقق التالي:
+                </p>
+                <div class="code-box">
+                    <div class="code">{code}</div>
+                </div>
+                <div class="warning">
+                    <strong>تنبيه:</strong> هذا الرمز صالح لمدة 15 دقيقة فقط.
+                </div>
+                <p>
+                    إذا لم تقم بإنشاء حساب، يرجى تجاهل هذا البريد الإلكتروني.
+                </p>
+            </div>
+            <div class="footer">
+                <p>© 2024 Sabr Learning Platform. جميع الحقوق محفوظة.</p>
+                <p>هذا بريد إلكتروني تلقائي، يرجى عدم الرد عليه.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    text_content = f"""
+    مرحباً {user.full_name},
+    
+    شكراً لتسجيلك في منصة Sabr للتعلم!
+    
+    رمز التحقق الخاص بك هو: {code}
+    
+    هذا الرمز صالح لمدة 15 دقيقة فقط.
+    
+    إذا لم تقم بإنشاء حساب، يرجى تجاهل هذا البريد.
+    
+    مع تحيات فريق Sabr Learning Platform
+    """
+    
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_content,
+        from_email=f'{settings.DEFAULT_FROM_NAME} <{settings.DEFAULT_FROM_EMAIL}>',
+        to=[user.email]
+    )
+    
+    email.attach_alternative(html_content, "text/html")
+    
+    try:
+        email.send(fail_silently=False)
+        return True
+    except Exception as e:
+        print(f"Error sending verification email: {str(e)}")
+        return False

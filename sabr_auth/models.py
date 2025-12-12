@@ -1,6 +1,36 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from datetime import timedelta
+import random
+import string
+
+class EmailVerification(models.Model):
+    """Model to store email verification codes"""
+    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='verifications')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            # الكود صالح لمدة 15 دقيقة
+            self.expires_at = timezone.now() + timedelta(minutes=15)
+        super().save(*args, **kwargs)
+    
+    def is_expired(self):
+        """Check if verification code is expired"""
+        return timezone.now() > self.expires_at
+    
+    @staticmethod
+    def generate_code():
+        """Generate 6-digit verification code"""
+        return ''.join(random.choices(string.digits, k=6))
 
 
 class UserManager(BaseUserManager):
@@ -45,6 +75,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(_('موظف'), default=False)
     date_joined = models.DateTimeField(_('تاريخ الانضمام'), auto_now_add=True)
     updated_at = models.DateTimeField(_('تاريخ التحديث'), auto_now=True)
+    is_email_verified = models.BooleanField(default=False)
     
     # Fix for groups and user_permissions clash
     groups = models.ManyToManyField(
