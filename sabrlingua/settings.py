@@ -100,7 +100,7 @@ DEFAULT_FROM_NAME = os.getenv('DEFAULT_FROM_NAME', 'Sabr Learning Platform')
 PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', 3600))
 
 # Frontend URL (for password reset link)
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://sabrlinguafront-production.up.railway.app/')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://sabrlinguafront-production.up.railway.app')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
