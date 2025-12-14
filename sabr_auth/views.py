@@ -16,11 +16,26 @@ from .serializers import (
     ForgotPasswordSerializer,
     ResetPasswordSerializer,
     EmailVerificationSerializer,
-    ResendVerificationSerializer,CompleteStudentProfileSerializer, StudentProfileSerializer,
+    ResendVerificationSerializer,
+    CompleteStudentProfileSerializer, 
+    StudentProfileSerializer,
 )
-from .utils import send_password_reset_email, send_password_reset_confirmation_email,send_verification_email
+from .utils import send_password_reset_email, send_password_reset_confirmation_email, send_verification_email
 from django.utils import timezone
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+
+def format_error_response(serializer_errors):
+    """Helper function to format serializer errors"""
+    if isinstance(serializer_errors, dict):
+        for field, messages in serializer_errors.items():
+            if isinstance(messages, list):
+                return messages[0] if messages else "حدث خطأ في التحقق من البيانات"
+            elif isinstance(messages, dict):
+                return format_error_response(messages)
+            else:
+                return str(messages)
+    return "حدث خطأ في التحقق من البيانات"
 
 
 class StudentRegistrationView(APIView):
@@ -58,11 +73,11 @@ class StudentRegistrationView(APIView):
                 # حذف المستخدم إذا فشل إرسال البريد
                 user.delete()
                 return Response({
-                    'error': 'حدث خطأ في إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى.'
+                    'error_message': 'حدث خطأ في إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى.'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -84,7 +99,7 @@ class VerifyEmailView(APIView):
                 user = User.objects.get(email=email, is_email_verified=False)
             except User.DoesNotExist:
                 return Response({
-                    'error': 'البريد الإلكتروني غير موجود أو تم التحقق منه بالفعل'
+                    'error_message': 'البريد الإلكتروني غير موجود أو تم التحقق منه بالفعل'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # البحث عن رمز التحقق
@@ -96,13 +111,13 @@ class VerifyEmailView(APIView):
                 ).latest('created_at')
             except EmailVerification.DoesNotExist:
                 return Response({
-                    'error': 'رمز التحقق غير صحيح'
+                    'error_message': 'رمز التحقق غير صحيح'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # التحقق من انتهاء صلاحية الرمز
             if verification.is_expired():
                 return Response({
-                    'error': 'انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد'
+                    'error_message': 'انتهت صلاحية رمز التحقق. يرجى طلب رمز جديد'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # تفعيل الحساب
@@ -132,7 +147,7 @@ class VerifyEmailView(APIView):
             }, status=status.HTTP_200_OK)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -153,7 +168,7 @@ class ResendVerificationView(APIView):
                 user = User.objects.get(email=email, is_email_verified=False)
             except User.DoesNotExist:
                 return Response({
-                    'error': 'البريد الإلكتروني غير موجود أو تم التحقق منه بالفعل'
+                    'error_message': 'البريد الإلكتروني غير موجود أو تم التحقق منه بالفعل'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # التحقق من عدم إرسال رمز خلال الدقيقة الأخيرة
@@ -165,7 +180,7 @@ class ResendVerificationView(APIView):
                 time_diff = timezone.now() - last_verification.created_at
                 if time_diff.total_seconds() < 60:
                     return Response({
-                        'error': 'يرجى الانتظار دقيقة واحدة قبل طلب رمز جديد'
+                        'error_message': 'يرجى الانتظار دقيقة واحدة قبل طلب رمز جديد'
                     }, status=status.HTTP_429_TOO_MANY_REQUESTS)
             
             # توليد رمز جديد
@@ -186,11 +201,11 @@ class ResendVerificationView(APIView):
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({
-                    'error': 'حدث خطأ في إرسال البريد الإلكتروني'
+                    'error_message': 'حدث خطأ في إرسال البريد الإلكتروني'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -224,11 +239,11 @@ class ForgotPasswordView(APIView):
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({
-                    'error': 'حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى'
+                    'error_message': 'حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -249,11 +264,11 @@ class ResetPasswordView(APIView):
             send_password_reset_confirmation_email(user)
             
             return Response({
-                'message': 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول'
+                'message': 'تم إعادة تعيين كلمة المرور بنجاح. يمكنك الآن العودة للتطبيق وتسجيل الدخول'
             }, status=status.HTTP_200_OK)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -278,7 +293,7 @@ class ChangePasswordView(APIView):
             }, status=status.HTTP_200_OK)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -323,7 +338,7 @@ class LoginView(APIView):
             }, status=status.HTTP_200_OK)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -345,13 +360,12 @@ class LogoutView(APIView):
                 }, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({
-                    'error': 'حدث خطأ أثناء تسجيل الخروج'
+                    'error_message': 'حدث خطأ أثناء تسجيل الخروج'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class CompleteStudentProfileView(APIView):
@@ -370,14 +384,14 @@ class CompleteStudentProfileView(APIView):
         # التحقق من أن المستخدم طالب
         if request.user.user_type != 'student':
             return Response({
-                'error': 'هذا الحساب ليس حساب طالب'
+                'error_message': 'هذا الحساب ليس حساب طالب'
             }, status=status.HTTP_403_FORBIDDEN)
         
         try:
             student = Student.objects.get(user=request.user)
         except Student.DoesNotExist:
             return Response({
-                'error': 'لم يتم العثور على ملف الطالب'
+                'error_message': 'لم يتم العثور على ملف الطالب'
             }, status=status.HTTP_404_NOT_FOUND)
         
         # التحقق من البيانات
@@ -411,7 +425,7 @@ class CompleteStudentProfileView(APIView):
             }, status=status.HTTP_200_OK)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -430,7 +444,7 @@ class StudentProfileView(APIView):
         # التحقق من أن المستخدم طالب
         if request.user.user_type != 'student':
             return Response({
-                'error': 'هذا الحساب ليس حساب طالب'
+                'error_message': 'هذا الحساب ليس حساب طالب'
             }, status=status.HTTP_403_FORBIDDEN)
         
         try:
@@ -448,7 +462,7 @@ class StudentProfileView(APIView):
             
         except Student.DoesNotExist:
             return Response({
-                'error': 'لم يتم العثور على ملف الطالب'
+                'error_message': 'لم يتم العثور على ملف الطالب'
             }, status=status.HTTP_404_NOT_FOUND)
 
 
@@ -467,14 +481,14 @@ class UpdateStudentProfileView(APIView):
         
         if request.user.user_type != 'student':
             return Response({
-                'error': 'هذا الحساب ليس حساب طالب'
+                'error_message': 'هذا الحساب ليس حساب طالب'
             }, status=status.HTTP_403_FORBIDDEN)
         
         try:
             student = Student.objects.get(user=request.user)
         except Student.DoesNotExist:
             return Response({
-                'error': 'لم يتم العثور على ملف الطالب'
+                'error_message': 'لم يتم العثور على ملف الطالب'
             }, status=status.HTTP_404_NOT_FOUND)
         
         # التحقق من البيانات
@@ -502,11 +516,11 @@ class UpdateStudentProfileView(APIView):
                 }, status=status.HTTP_200_OK)
             
             return Response({
-                'error': 'لم يتم تقديم أي بيانات للتحديث'
+                'error_message': 'لم يتم تقديم أي بيانات للتحديث'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         return Response({
-            'errors': serializer.errors
+            'error_message': format_error_response(serializer.errors)
         }, status=status.HTTP_400_BAD_REQUEST)
     
     def patch(self, request):
