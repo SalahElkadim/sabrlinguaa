@@ -120,7 +120,7 @@ MIDDLEWARE = [
 
 # CORS Settings
 CORS_ALLOWED_ORIGINS = [
-    os.getenv('FRONTEND_URL', 'http://localhost:3000'),
+    os.getenv('FRONTEND_URL', 'http://localhost:3000','https://sabrlinguaa-production.up.railway.app',),
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -205,3 +205,8 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = 'DENY'
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://sabrlinguaa-production.up.railway.app',
+    'https://*.railway.app',  # للسماح بكل subdomains
+]
