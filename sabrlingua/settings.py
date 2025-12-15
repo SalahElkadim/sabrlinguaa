@@ -120,9 +120,10 @@ MIDDLEWARE = [
 
 # CORS Settings
 CORS_ALLOWED_ORIGINS = [
-    os.getenv('FRONTEND_URL', 'http://localhost:3000','https://sabrlinguaa-production.up.railway.app',),
+    os.getenv('FRONTEND_URL', 'http://localhost:3000','https://sabrlinguaa-production.up.railway.app'),
 ]
-CORS_ALLOW_CREDENTIALS = True
+
+
 
 ROOT_URLCONF = 'sabrlingua.urls'
 
