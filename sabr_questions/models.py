@@ -4,6 +4,91 @@ from cloudinary.models import CloudinaryField
 
 
 # ============================================
+# Placement Test Model
+# ============================================
+
+class PlacementTest(models.Model):
+    """
+    نموذج امتحان تحديد المستوى
+    """
+    title = models.CharField(max_length=200, verbose_name="عنوان الامتحان")
+    description = models.TextField(blank=True, null=True, verbose_name="وصف الامتحان")
+    
+    # المدة الزمنية
+    duration_minutes = models.PositiveIntegerField(
+        verbose_name="مدة الامتحان (بالدقائق)",
+        help_text="المدة الزمنية المحددة لإنهاء الامتحان"
+    )
+    
+    # درجات النجاح للمستويات
+    a1_min_score = models.PositiveIntegerField(
+        default=0,
+        verbose_name="الحد الأدنى لمستوى A1",
+        help_text="من 0 إلى هذه الدرجة = A1"
+    )
+    a2_min_score = models.PositiveIntegerField(
+        verbose_name="الحد الأدنى لمستوى A2",
+        help_text="من الدرجة السابقة إلى هذه الدرجة = A2"
+    )
+    b1_min_score = models.PositiveIntegerField(
+        verbose_name="الحد الأدنى لمستوى B1",
+        help_text="من الدرجة السابقة إلى هذه الدرجة = B1"
+    )
+    b2_min_score = models.PositiveIntegerField(
+        verbose_name="الحد الأدنى لمستوى B2",
+        help_text="من الدرجة السابقة فما فوق = B2"
+    )
+    
+    # الحالة
+    is_active = models.BooleanField(default=False, verbose_name="نشط")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="تاريخ التحديث")
+    
+    class Meta:
+        verbose_name = "امتحان تحديد المستوى"
+        verbose_name_plural = "امتحانات تحديد المستوى"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.title
+    
+    def get_total_points(self):
+        """حساب مجموع النقاط الكلي للامتحان"""
+        total = 0
+        
+        # MCQ Questions
+        for mcq_set in self.mcq_sets.all():
+            total += sum(q.points for q in mcq_set.questions.all())
+        
+        # Reading Questions
+        for passage in self.reading_passages.all():
+            total += sum(q.points for q in passage.questions.all())
+        
+        # Listening Questions
+        for audio in self.listening_audios.all():
+            total += sum(q.points for q in audio.questions.all())
+        
+        # Speaking Questions
+        for video in self.speaking_videos.all():
+            total += sum(q.points for q in video.questions.all())
+        
+        # Writing Questions
+        total += sum(q.points for q in self.writing_questions.all())
+        
+        return total
+    
+    def get_questions_count(self):
+        """حساب عدد الأسئلة الكلي"""
+        count = 0
+        count += sum(mcq_set.questions.count() for mcq_set in self.mcq_sets.all())
+        count += sum(passage.questions.count() for passage in self.reading_passages.all())
+        count += sum(audio.questions.count() for audio in self.listening_audios.all())
+        count += sum(video.questions.count() for video in self.speaking_videos.all())
+        count += self.writing_questions.count()
+        return count
+
+
+# ============================================
 # Abstract Base Models (النماذج الأساسية)
 # ============================================
 
@@ -86,6 +171,12 @@ class MCQQuestionSet(BaseQuestion):
     """
     مجموعة أسئلة MCQ (النموذج الأب)
     """
+    placement_test = models.ForeignKey(
+        PlacementTest,
+        on_delete=models.CASCADE,
+        related_name='mcq_sets',
+        verbose_name="امتحان تحديد المستوى"
+    )
     description = models.TextField(
         blank=True, 
         null=True,
@@ -95,6 +186,7 @@ class MCQQuestionSet(BaseQuestion):
     class Meta:
         verbose_name = "مجموعة أسئلة MCQ"
         verbose_name_plural = "مجموعات أسئلة MCQ"
+        ordering = ['placement_test', 'order', 'created_at']
 
 
 class MCQQuestion(BaseMCQQuestion):
@@ -123,6 +215,14 @@ class ReadingPassage(BaseQuestion):
     """
     قطعة القراءة (النموذج الأب)
     """
+    placement_test = models.ForeignKey(
+        PlacementTest,
+        on_delete=models.CASCADE,
+        related_name='reading_passages',
+        verbose_name="امتحان تحديد المستوى",
+        blank=True,
+        null=True
+    )
     passage_text = models.TextField(verbose_name="نص القطعة")
     passage_image = CloudinaryField(
         'image',
@@ -136,20 +236,11 @@ class ReadingPassage(BaseQuestion):
         null=True,
         verbose_name="مصدر القطعة"
     )
-    difficulty_level = models.CharField(
-        max_length=20,
-        choices=[
-            ('beginner', 'مبتدئ'),
-            ('intermediate', 'متوسط'),
-            ('advanced', 'متقدم'),
-        ],
-        default='intermediate',
-        verbose_name="مستوى الصعوبة"
-    )
     
     class Meta:
         verbose_name = "قطعة قراءة"
         verbose_name_plural = "قطع القراءة"
+        ordering = ['placement_test', 'order', 'created_at']
 
 
 class ReadingQuestion(BaseMCQQuestion):
@@ -178,6 +269,14 @@ class ListeningAudio(BaseQuestion):
     """
     التسجيل الصوتي (النموذج الأب)
     """
+    placement_test = models.ForeignKey(
+        PlacementTest,
+        on_delete=models.CASCADE,
+        related_name='listening_audios',
+        verbose_name="امتحان تحديد المستوى",
+        blank=True,
+        null=True
+    )
     audio_file = CloudinaryField(
         'video',
         resource_type='video',
@@ -194,20 +293,11 @@ class ListeningAudio(BaseQuestion):
         help_text="المدة بالثواني",
         verbose_name="مدة التسجيل"
     )
-    difficulty_level = models.CharField(
-        max_length=20,
-        choices=[
-            ('beginner', 'مبتدئ'),
-            ('intermediate', 'متوسط'),
-            ('advanced', 'متقدم'),
-        ],
-        default='intermediate',
-        verbose_name="مستوى الصعوبة"
-    )
     
     class Meta:
         verbose_name = "تسجيل صوتي"
         verbose_name_plural = "التسجيلات الصوتية"
+        ordering = ['placement_test', 'order', 'created_at']
 
 
 class ListeningQuestion(BaseMCQQuestion):
@@ -236,6 +326,14 @@ class SpeakingVideo(BaseQuestion):
     """
     الفيديو التعليمي (النموذج الأب)
     """
+    placement_test = models.ForeignKey(
+        PlacementTest,
+        on_delete=models.CASCADE,
+        related_name='speaking_videos',
+        verbose_name="امتحان تحديد المستوى",
+        blank=True,
+        null=True
+    )
     video_file = CloudinaryField(
         'video',
         resource_type='video',
@@ -262,6 +360,7 @@ class SpeakingVideo(BaseQuestion):
     class Meta:
         verbose_name = "فيديو تحدث"
         verbose_name_plural = "فيديوهات التحدث"
+        ordering = ['placement_test', 'order', 'created_at']
 
 
 class SpeakingQuestion(BaseMCQQuestion):
@@ -290,6 +389,14 @@ class WritingQuestion(models.Model):
     """
     سؤال كتابة (نموذج مستقل بدون أب)
     """
+    placement_test = models.ForeignKey(
+        PlacementTest,
+        on_delete=models.CASCADE,
+        related_name='writing_questions',
+        verbose_name="امتحان تحديد المستوى",
+        blank=True,
+        null=True
+    )
     title = models.CharField(max_length=500, verbose_name="عنوان السؤال")
     question_text = models.TextField(verbose_name="نص السؤال")
     question_image = CloudinaryField(
@@ -330,17 +437,6 @@ class WritingQuestion(models.Model):
         verbose_name="النقاط"
     )
     
-    difficulty_level = models.CharField(
-        max_length=20,
-        choices=[
-            ('beginner', 'مبتدئ'),
-            ('intermediate', 'متوسط'),
-            ('advanced', 'متقدم'),
-        ],
-        default='intermediate',
-        verbose_name="مستوى الصعوبة"
-    )
-    
     order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
     is_active = models.BooleanField(default=True, verbose_name="نشط")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
@@ -349,7 +445,7 @@ class WritingQuestion(models.Model):
     class Meta:
         verbose_name = "سؤال كتابة"
         verbose_name_plural = "أسئلة الكتابة"
-        ordering = ['order', 'created_at']
+        ordering = ['placement_test', 'order', 'created_at']
     
     def __str__(self):
         return self.title

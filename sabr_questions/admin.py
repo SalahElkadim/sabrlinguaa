@@ -1,12 +1,105 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.urls import reverse
+from django.utils.safestring import mark_safe
 from .models import (
+    PlacementTest,
     MCQQuestionSet, MCQQuestion,
     ReadingPassage, ReadingQuestion,
     ListeningAudio, ListeningQuestion,
     SpeakingVideo, SpeakingQuestion,
     WritingQuestion
 )
+
+
+# ============================================
+# Placement Test Admin
+# ============================================
+
+@admin.register(PlacementTest)
+class PlacementTestAdmin(admin.ModelAdmin):
+    list_display = ['title', 'duration_display', 'total_questions', 'total_points_display', 
+                    'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['title', 'description']
+    list_editable = ['is_active']
+    
+    fieldsets = (
+        ('معلومات أساسية', {
+            'fields': ('title', 'description', 'duration_minutes', 'is_active')
+        }),
+        ('درجات المستويات', {
+            'fields': ('a1_min_score', 'a2_min_score', 'b1_min_score', 'b2_min_score'),
+            'description': 'حدد الحد الأدنى من الدرجات لكل مستوى'
+        }),
+    )
+    
+    def duration_display(self, obj):
+        return format_html(
+            '<span style="color: #FF5722; font-weight: bold;">⏱️ {} دقيقة</span>',
+            obj.duration_minutes
+        )
+    duration_display.short_description = 'المدة'
+    
+    def total_questions(self, obj):
+        count = obj.get_questions_count()
+        return format_html(
+            '<span style="background-color: #2196F3; color: white; padding: 3px 10px; '
+            'border-radius: 3px; font-weight: bold;">📝 {}</span>',
+            count
+        )
+    total_questions.short_description = 'عدد الأسئلة'
+    
+    def total_points_display(self, obj):
+        points = obj.get_total_points()
+        return format_html(
+            '<span style="background-color: #4CAF50; color: white; padding: 3px 10px; '
+            'border-radius: 3px; font-weight: bold;">⭐ {}</span>',
+            points
+        )
+    total_points_display.short_description = 'مجموع النقاط'
+    
+    def get_readonly_fields(self, request, obj=None):
+        # عرض ملخص الامتحان عند التعديل فقط
+        if obj:
+            return self.readonly_fields + ('exam_summary',)
+        return self.readonly_fields
+    
+    def exam_summary(self, obj):
+        """عرض ملخص تفصيلي للامتحان"""
+        html = '<div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 10px 0;">'
+        html += '<h3 style="margin-top: 0;">📊 ملخص الامتحان</h3>'
+        
+        # MCQ
+        mcq_count = sum(s.questions.count() for s in obj.mcq_sets.all())
+        if mcq_count > 0:
+            html += f'<p>✅ أسئلة MCQ: <strong>{mcq_count}</strong> سؤال</p>'
+        
+        # Reading
+        reading_count = sum(p.questions.count() for p in obj.reading_passages.all())
+        if reading_count > 0:
+            html += f'<p>📖 أسئلة القراءة: <strong>{reading_count}</strong> سؤال</p>'
+        
+        # Listening
+        listening_count = sum(a.questions.count() for a in obj.listening_audios.all())
+        if listening_count > 0:
+            html += f'<p>🎧 أسئلة الاستماع: <strong>{listening_count}</strong> سؤال</p>'
+        
+        # Speaking
+        speaking_count = sum(v.questions.count() for v in obj.speaking_videos.all())
+        if speaking_count > 0:
+            html += f'<p>🎤 أسئلة التحدث: <strong>{speaking_count}</strong> سؤال</p>'
+        
+        # Writing
+        writing_count = obj.writing_questions.count()
+        if writing_count > 0:
+            html += f'<p>✍️ أسئلة الكتابة: <strong>{writing_count}</strong> سؤال</p>'
+        
+        html += f'<hr><p style="font-size: 16px;"><strong>المجموع الكلي: {obj.get_questions_count()} سؤال | {obj.get_total_points()} نقطة</strong></p>'
+        html += '</div>'
+        
+        return mark_safe(html)
+    exam_summary.short_description = 'ملخص الامتحان'
 
 
 # ============================================
@@ -51,16 +144,16 @@ class SpeakingQuestionInline(admin.TabularInline):
 
 @admin.register(MCQQuestionSet)
 class MCQQuestionSetAdmin(admin.ModelAdmin):
-    list_display = ['title', 'questions_count', 'is_active', 'order', 'created_at']
-    list_filter = ['is_active', 'created_at']
+    list_display = ['title', 'placement_test', 'questions_count', 'is_active', 'order', 'created_at']
+    list_filter = ['placement_test', 'is_active', 'created_at']
     search_fields = ['title', 'description']
     list_editable = ['is_active', 'order']
-    ordering = ['order', '-created_at']
+    ordering = ['placement_test', 'order', '-created_at']
     inlines = [MCQQuestionInline]
     
     fieldsets = (
         ('معلومات أساسية', {
-            'fields': ('title', 'description', 'order', 'is_active')
+            'fields': ('placement_test', 'title', 'description', 'order', 'is_active')
         }),
     )
     
@@ -78,7 +171,7 @@ class MCQQuestionSetAdmin(admin.ModelAdmin):
 class MCQQuestionAdmin(admin.ModelAdmin):
     list_display = ['question_preview', 'question_set', 'correct_answer', 
                     'points', 'order', 'created_at']
-    list_filter = ['question_set', 'correct_answer', 'created_at']
+    list_filter = ['question_set__placement_test', 'question_set', 'correct_answer', 'created_at']
     search_fields = ['question_text', 'explanation']
     list_editable = ['points', 'order']
     ordering = ['question_set', 'order', '-created_at']
@@ -106,17 +199,16 @@ class MCQQuestionAdmin(admin.ModelAdmin):
 
 @admin.register(ReadingPassage)
 class ReadingPassageAdmin(admin.ModelAdmin):
-    list_display = ['title', 'questions_count', 'difficulty_level', 
-                    'is_active', 'order', 'created_at']
-    list_filter = ['difficulty_level', 'is_active', 'created_at']
+    list_display = ['title', 'placement_test', 'questions_count', 'is_active', 'order', 'created_at']
+    list_filter = ['placement_test', 'is_active', 'created_at']
     search_fields = ['title', 'passage_text', 'source']
     list_editable = ['is_active', 'order']
-    ordering = ['order', '-created_at']
+    ordering = ['placement_test', 'order', '-created_at']
     inlines = [ReadingQuestionInline]
     
     fieldsets = (
         ('معلومات أساسية', {
-            'fields': ('title', 'difficulty_level', 'order', 'is_active')
+            'fields': ('placement_test', 'title', 'order', 'is_active')
         }),
         ('القطعة', {
             'fields': ('passage_text', 'passage_image', 'source')
@@ -137,7 +229,7 @@ class ReadingPassageAdmin(admin.ModelAdmin):
 class ReadingQuestionAdmin(admin.ModelAdmin):
     list_display = ['question_preview', 'passage', 'correct_answer', 
                     'points', 'order', 'created_at']
-    list_filter = ['passage', 'correct_answer', 'created_at']
+    list_filter = ['passage__placement_test', 'passage', 'correct_answer', 'created_at']
     search_fields = ['question_text', 'explanation']
     list_editable = ['points', 'order']
     ordering = ['passage', 'order', '-created_at']
@@ -165,17 +257,17 @@ class ReadingQuestionAdmin(admin.ModelAdmin):
 
 @admin.register(ListeningAudio)
 class ListeningAudioAdmin(admin.ModelAdmin):
-    list_display = ['title', 'questions_count', 'difficulty_level', 
-                    'duration_display', 'is_active', 'order', 'created_at']
-    list_filter = ['difficulty_level', 'is_active', 'created_at']
+    list_display = ['title', 'placement_test', 'questions_count', 'duration_display', 
+                    'is_active', 'order', 'created_at']
+    list_filter = ['placement_test', 'is_active', 'created_at']
     search_fields = ['title', 'transcript']
     list_editable = ['is_active', 'order']
-    ordering = ['order', '-created_at']
+    ordering = ['placement_test', 'order', '-created_at']
     inlines = [ListeningQuestionInline]
     
     fieldsets = (
         ('معلومات أساسية', {
-            'fields': ('title', 'difficulty_level', 'order', 'is_active')
+            'fields': ('placement_test', 'title', 'order', 'is_active')
         }),
         ('التسجيل الصوتي', {
             'fields': ('audio_file', 'duration', 'transcript')
@@ -204,7 +296,7 @@ class ListeningAudioAdmin(admin.ModelAdmin):
 class ListeningQuestionAdmin(admin.ModelAdmin):
     list_display = ['question_preview', 'audio', 'correct_answer', 
                     'points', 'order', 'created_at']
-    list_filter = ['audio', 'correct_answer', 'created_at']
+    list_filter = ['audio__placement_test', 'audio', 'correct_answer', 'created_at']
     search_fields = ['question_text', 'explanation']
     list_editable = ['points', 'order']
     ordering = ['audio', 'order', '-created_at']
@@ -232,17 +324,17 @@ class ListeningQuestionAdmin(admin.ModelAdmin):
 
 @admin.register(SpeakingVideo)
 class SpeakingVideoAdmin(admin.ModelAdmin):
-    list_display = ['title', 'questions_count', 'duration_display', 
+    list_display = ['title', 'placement_test', 'questions_count', 'duration_display', 
                     'is_active', 'order', 'created_at']
-    list_filter = ['is_active', 'created_at']
+    list_filter = ['placement_test', 'is_active', 'created_at']
     search_fields = ['title', 'description']
     list_editable = ['is_active', 'order']
-    ordering = ['order', '-created_at']
+    ordering = ['placement_test', 'order', '-created_at']
     inlines = [SpeakingQuestionInline]
     
     fieldsets = (
         ('معلومات أساسية', {
-            'fields': ('title', 'description', 'order', 'is_active')
+            'fields': ('placement_test', 'title', 'description', 'order', 'is_active')
         }),
         ('الفيديو', {
             'fields': ('video_file', 'thumbnail', 'duration')
@@ -271,7 +363,7 @@ class SpeakingVideoAdmin(admin.ModelAdmin):
 class SpeakingQuestionAdmin(admin.ModelAdmin):
     list_display = ['question_preview', 'video', 'correct_answer', 
                     'points', 'order', 'created_at']
-    list_filter = ['video', 'correct_answer', 'created_at']
+    list_filter = ['video__placement_test', 'video', 'correct_answer', 'created_at']
     search_fields = ['question_text', 'explanation']
     list_editable = ['points', 'order']
     ordering = ['video', 'order', '-created_at']
@@ -299,16 +391,16 @@ class SpeakingQuestionAdmin(admin.ModelAdmin):
 
 @admin.register(WritingQuestion)
 class WritingQuestionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'difficulty_level', 'points', 'word_range', 
+    list_display = ['title', 'placement_test', 'points', 'word_range', 
                     'is_active', 'order', 'created_at']
-    list_filter = ['difficulty_level', 'is_active', 'created_at']
+    list_filter = ['placement_test', 'is_active', 'created_at']
     search_fields = ['title', 'question_text', 'sample_answer']
     list_editable = ['is_active', 'order']
-    ordering = ['order', '-created_at']
+    ordering = ['placement_test', 'order', '-created_at']
     
     fieldsets = (
         ('معلومات أساسية', {
-            'fields': ('title', 'difficulty_level', 'order', 'is_active')
+            'fields': ('placement_test', 'title', 'order', 'is_active')
         }),
         ('السؤال', {
             'fields': ('question_text', 'question_image')
