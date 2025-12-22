@@ -33,8 +33,6 @@ from .views import (
     WritingQuestionDetailAPIView,
 )
 
-app_name = 'placement_tests'
-
 urlpatterns = [
     # ============================================
     # Placement Test URLs
