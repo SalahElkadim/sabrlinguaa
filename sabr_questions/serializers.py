@@ -251,6 +251,7 @@ class PlacementTestListSerializer(serializers.ModelSerializer):
         model = PlacementTest
         fields = [
             'id', 'title', 'description', 'duration_minutes',
+            'a1_min_score', 'a2_min_score', 'b1_min_score', 'b2_min_score',  # أضف دول
             'is_active', 'total_points', 'questions_count',
             'created_at', 'updated_at'
         ]
@@ -261,7 +262,6 @@ class PlacementTestListSerializer(serializers.ModelSerializer):
     
     def get_questions_count(self, obj):
         return obj.get_questions_count()
-
 
 class PlacementTestDetailSerializer(serializers.ModelSerializer):
     """Serializer لتفاصيل الامتحان الكاملة"""
