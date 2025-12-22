@@ -1,105 +1,90 @@
 from django.urls import path
 from .views import (
     # Placement Test
-    PlacementTestListCreateView,
-    PlacementTestDetailView,
+    PlacementTestListCreateAPIView,
+    PlacementTestDetailAPIView,
     
-    # MCQ Question Set
-    MCQQuestionSetListCreateView,
-    MCQQuestionSetDetailView,
+    # MCQ
+    MCQQuestionSetListCreateAPIView,
+    MCQQuestionSetDetailAPIView,
+    MCQQuestionListCreateAPIView,
+    MCQQuestionDetailAPIView,
     
-    # MCQ Question
-    MCQQuestionListCreateView,
-    MCQQuestionDetailView,
+    # Reading
+    ReadingPassageListCreateAPIView,
+    ReadingPassageDetailAPIView,
+    ReadingQuestionListCreateAPIView,
+    ReadingQuestionDetailAPIView,
     
-    # Reading Passage
-    ReadingPassageListCreateView,
-    ReadingPassageDetailView,
+    # Listening
+    ListeningAudioListCreateAPIView,
+    ListeningAudioDetailAPIView,
+    ListeningQuestionListCreateAPIView,
+    ListeningQuestionDetailAPIView,
     
-    # Reading Question
-    ReadingQuestionListCreateView,
-    ReadingQuestionDetailView,
+    # Speaking
+    SpeakingVideoListCreateAPIView,
+    SpeakingVideoDetailAPIView,
+    SpeakingQuestionListCreateAPIView,
+    SpeakingQuestionDetailAPIView,
     
-    # Listening Audio
-    ListeningAudioListCreateView,
-    ListeningAudioDetailView,
-    
-    # Listening Question
-    ListeningQuestionListCreateView,
-    ListeningQuestionDetailView,
-    
-    # Speaking Video
-    SpeakingVideoListCreateView,
-    SpeakingVideoDetailView,
-    
-    # Speaking Question
-    SpeakingQuestionListCreateView,
-    SpeakingQuestionDetailView,
-    
-    # Writing Question
-    WritingQuestionListCreateView,
-    WritingQuestionDetailView,
+    # Writing
+    WritingQuestionListCreateAPIView,
+    WritingQuestionDetailAPIView,
 )
 
+app_name = 'placement_tests'
 
 urlpatterns = [
     # ============================================
     # Placement Test URLs
     # ============================================
-    path('tests/', PlacementTestListCreateView.as_view(), name='test-list-create'),
-    path('tests/<int:pk>/', PlacementTestDetailView.as_view(), name='test-detail'),
+    path('tests/', PlacementTestListCreateAPIView.as_view(), name='test-list-create'),
+    path('tests/<int:pk>/', PlacementTestDetailAPIView.as_view(), name='test-detail'),
     
     # ============================================
     # MCQ Question Set URLs
     # ============================================
-    path('mcq-sets/', MCQQuestionSetListCreateView.as_view(), name='mcq-set-list-create'),
-    path('mcq-sets/<int:pk>/', MCQQuestionSetDetailView.as_view(), name='mcq-set-detail'),
+    path('mcq-sets/', MCQQuestionSetListCreateAPIView.as_view(), name='mcq-set-list-create'),
+    path('mcq-sets/<int:pk>/', MCQQuestionSetDetailAPIView.as_view(), name='mcq-set-detail'),
+    
+    # MCQ Questions URLs
+    path('mcq-questions/', MCQQuestionListCreateAPIView.as_view(), name='mcq-question-list-create'),
+    path('mcq-questions/<int:pk>/', MCQQuestionDetailAPIView.as_view(), name='mcq-question-detail'),
     
     # ============================================
-    # MCQ Question URLs
+    # Reading URLs
     # ============================================
-    path('mcq-questions/', MCQQuestionListCreateView.as_view(), name='mcq-question-list-create'),
-    path('mcq-questions/<int:pk>/', MCQQuestionDetailView.as_view(), name='mcq-question-detail'),
+    path('reading-passages/', ReadingPassageListCreateAPIView.as_view(), name='reading-passage-list-create'),
+    path('reading-passages/<int:pk>/', ReadingPassageDetailAPIView.as_view(), name='reading-passage-detail'),
+    
+    # Reading Questions URLs
+    path('reading-questions/', ReadingQuestionListCreateAPIView.as_view(), name='reading-question-list-create'),
+    path('reading-questions/<int:pk>/', ReadingQuestionDetailAPIView.as_view(), name='reading-question-detail'),
     
     # ============================================
-    # Reading Passage URLs
+    # Listening URLs
     # ============================================
-    path('reading-passages/', ReadingPassageListCreateView.as_view(), name='reading-passage-list-create'),
-    path('reading-passages/<int:pk>/', ReadingPassageDetailView.as_view(), name='reading-passage-detail'),
+    path('listening-audios/', ListeningAudioListCreateAPIView.as_view(), name='listening-audio-list-create'),
+    path('listening-audios/<int:pk>/', ListeningAudioDetailAPIView.as_view(), name='listening-audio-detail'),
+    
+    # Listening Questions URLs
+    path('listening-questions/', ListeningQuestionListCreateAPIView.as_view(), name='listening-question-list-create'),
+    path('listening-questions/<int:pk>/', ListeningQuestionDetailAPIView.as_view(), name='listening-question-detail'),
     
     # ============================================
-    # Reading Question URLs
+    # Speaking URLs
     # ============================================
-    path('reading-questions/', ReadingQuestionListCreateView.as_view(), name='reading-question-list-create'),
-    path('reading-questions/<int:pk>/', ReadingQuestionDetailView.as_view(), name='reading-question-detail'),
+    path('speaking-videos/', SpeakingVideoListCreateAPIView.as_view(), name='speaking-video-list-create'),
+    path('speaking-videos/<int:pk>/', SpeakingVideoDetailAPIView.as_view(), name='speaking-video-detail'),
+    
+    # Speaking Questions URLs
+    path('speaking-questions/', SpeakingQuestionListCreateAPIView.as_view(), name='speaking-question-list-create'),
+    path('speaking-questions/<int:pk>/', SpeakingQuestionDetailAPIView.as_view(), name='speaking-question-detail'),
     
     # ============================================
-    # Listening Audio URLs
+    # Writing URLs
     # ============================================
-    path('listening-audios/', ListeningAudioListCreateView.as_view(), name='listening-audio-list-create'),
-    path('listening-audios/<int:pk>/', ListeningAudioDetailView.as_view(), name='listening-audio-detail'),
-    
-    # ============================================
-    # Listening Question URLs
-    # ============================================
-    path('listening-questions/', ListeningQuestionListCreateView.as_view(), name='listening-question-list-create'),
-    path('listening-questions/<int:pk>/', ListeningQuestionDetailView.as_view(), name='listening-question-detail'),
-    
-    # ============================================
-    # Speaking Video URLs
-    # ============================================
-    path('speaking-videos/', SpeakingVideoListCreateView.as_view(), name='speaking-video-list-create'),
-    path('speaking-videos/<int:pk>/', SpeakingVideoDetailView.as_view(), name='speaking-video-detail'),
-    
-    # ============================================
-    # Speaking Question URLs
-    # ============================================
-    path('speaking-questions/', SpeakingQuestionListCreateView.as_view(), name='speaking-question-list-create'),
-    path('speaking-questions/<int:pk>/', SpeakingQuestionDetailView.as_view(), name='speaking-question-detail'),
-    
-    # ============================================
-    # Writing Question URLs
-    # ============================================
-    path('writing-questions/', WritingQuestionListCreateView.as_view(), name='writing-question-list-create'),
-    path('writing-questions/<int:pk>/', WritingQuestionDetailView.as_view(), name='writing-question-detail'),
+    path('writing-questions/', WritingQuestionListCreateAPIView.as_view(), name='writing-question-list-create'),
+    path('writing-questions/<int:pk>/', WritingQuestionDetailAPIView.as_view(), name='writing-question-detail'),
 ]

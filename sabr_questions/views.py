@@ -1,8 +1,11 @@
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.shortcuts import get_object_or_404
+from django.db.models import Count, Sum
+
 from .models import (
     PlacementTest, MCQQuestionSet, MCQQuestion,
     ReadingPassage, ReadingQuestion,
@@ -12,10 +15,15 @@ from .models import (
 )
 from .serializers import (
     PlacementTestListSerializer, PlacementTestDetailSerializer,
-    MCQQuestionSetSerializer, MCQQuestionSerializer,
-    ReadingPassageSerializer, ReadingQuestionSerializer,
-    ListeningAudioSerializer, ListeningQuestionSerializer,
-    SpeakingVideoSerializer, SpeakingQuestionSerializer,
+    PlacementTestCreateSerializer,
+    MCQQuestionSetSerializer, MCQQuestionSetCreateSerializer,
+    MCQQuestionSerializer,
+    ReadingPassageSerializer, ReadingPassageCreateSerializer,
+    ReadingQuestionSerializer,
+    ListeningAudioSerializer, ListeningAudioCreateSerializer,
+    ListeningQuestionSerializer,
+    SpeakingVideoSerializer, SpeakingVideoCreateSerializer,
+    SpeakingQuestionSerializer,
     WritingQuestionSerializer
 )
 
@@ -24,544 +32,830 @@ from .serializers import (
 # Placement Test Views
 # ============================================
 
-class PlacementTestListCreateView(APIView):
-    """قائمة وإنشاء امتحانات تحديد المستوى"""
-    permission_classes = [IsAuthenticated]
-
+class PlacementTestListCreateAPIView(APIView):
+    """
+    GET: قائمة جميع الامتحانات
+    POST: إنشاء امتحان جديد
+    """
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
+        """الحصول على قائمة الامتحانات"""
         tests = PlacementTest.objects.all()
+        
+        # فلترة حسب الحالة
+        is_active = request.query_params.get('is_active', None)
+        if is_active is not None:
+            tests = tests.filter(is_active=is_active.lower() == 'true')
+        
         serializer = PlacementTestListSerializer(tests, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': tests.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
-        serializer = PlacementTestDetailSerializer(data=request.data)
+        """إنشاء امتحان جديد"""
+        serializer = PlacementTestCreateSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            test = serializer.save()
+            detail_serializer = PlacementTestDetailSerializer(test)
+            return Response({
+                'success': True,
+                'message': 'تم إنشاء الامتحان بنجاح',
+                'data': detail_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class PlacementTestDetailView(APIView):
-    """عرض وتعديل وحذف امتحان تحديد المستوى"""
-    permission_classes = [IsAuthenticated]
-
+class PlacementTestDetailAPIView(APIView):
+    """
+    GET: تفاصيل امتحان محدد
+    PUT: تحديث امتحان
+    DELETE: حذف امتحان
+    """
+    permission_classes = [IsAdminUser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل امتحان"""
         test = get_object_or_404(PlacementTest, pk=pk)
         serializer = PlacementTestDetailSerializer(test)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
+        """تحديث امتحان"""
         test = get_object_or_404(PlacementTest, pk=pk)
-        serializer = PlacementTestDetailSerializer(test, data=request.data)
+        serializer = PlacementTestCreateSerializer(test, data=request.data, partial=True)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        test = get_object_or_404(PlacementTest, pk=pk)
-        serializer = PlacementTestDetailSerializer(test, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            test = serializer.save()
+            detail_serializer = PlacementTestDetailSerializer(test)
+            return Response({
+                'success': True,
+                'message': 'تم تحديث الامتحان بنجاح',
+                'data': detail_serializer.data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف امتحان"""
         test = get_object_or_404(PlacementTest, pk=pk)
         test.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف الامتحان بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # MCQ Question Set Views
 # ============================================
 
-class MCQQuestionSetListCreateView(APIView):
-    """قائمة وإنشاء مجموعات أسئلة MCQ"""
-    permission_classes = [IsAuthenticated]
-
+class MCQQuestionSetListCreateAPIView(APIView):
+    """
+    GET: قائمة مجموعات أسئلة MCQ
+    POST: إنشاء مجموعة جديدة
+    """
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
-        question_sets = MCQQuestionSet.objects.all()
-        placement_test_id = request.query_params.get('placement_test')
-        if placement_test_id:
-            question_sets = question_sets.filter(placement_test_id=placement_test_id)
+        """الحصول على قائمة المجموعات"""
+        test_id = request.query_params.get('test_id', None)
+        
+        if test_id:
+            question_sets = MCQQuestionSet.objects.filter(placement_test_id=test_id)
+        else:
+            question_sets = MCQQuestionSet.objects.all()
+        
         serializer = MCQQuestionSetSerializer(question_sets, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': question_sets.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
-        serializer = MCQQuestionSetSerializer(data=request.data)
+        """إنشاء مجموعة أسئلة جديدة"""
+        serializer = MCQQuestionSetCreateSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            question_set = serializer.save()
+            detail_serializer = MCQQuestionSetSerializer(question_set)
+            return Response({
+                'success': True,
+                'message': 'تم إنشاء مجموعة الأسئلة بنجاح',
+                'data': detail_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class MCQQuestionSetDetailView(APIView):
-    """عرض وتعديل وحذف مجموعة أسئلة MCQ"""
-    permission_classes = [IsAuthenticated]
-
+class MCQQuestionSetDetailAPIView(APIView):
+    """
+    GET: تفاصيل مجموعة أسئلة
+    PUT: تحديث مجموعة
+    DELETE: حذف مجموعة
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل المجموعة"""
         question_set = get_object_or_404(MCQQuestionSet, pk=pk)
         serializer = MCQQuestionSetSerializer(question_set)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
+        """تحديث المجموعة"""
         question_set = get_object_or_404(MCQQuestionSet, pk=pk)
-        serializer = MCQQuestionSetSerializer(question_set, data=request.data)
+        serializer = MCQQuestionSetCreateSerializer(
+            question_set, 
+            data=request.data, 
+            partial=True
+        )
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        question_set = get_object_or_404(MCQQuestionSet, pk=pk)
-        serializer = MCQQuestionSetSerializer(question_set, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            question_set = serializer.save()
+            detail_serializer = MCQQuestionSetSerializer(question_set)
+            return Response({
+                'success': True,
+                'message': 'تم تحديث المجموعة بنجاح',
+                'data': detail_serializer.data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف المجموعة"""
         question_set = get_object_or_404(MCQQuestionSet, pk=pk)
         question_set.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف المجموعة بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # MCQ Question Views
 # ============================================
 
-class MCQQuestionListCreateView(APIView):
-    """قائمة وإنشاء أسئلة MCQ"""
-    permission_classes = [IsAuthenticated]
-
+class MCQQuestionListCreateAPIView(APIView):
+    """
+    GET: قائمة أسئلة MCQ
+    POST: إضافة سؤال جديد
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        questions = MCQQuestion.objects.all()
-        question_set_id = request.query_params.get('question_set')
-        if question_set_id:
-            questions = questions.filter(question_set_id=question_set_id)
+        """الحصول على قائمة الأسئلة"""
+        set_id = request.query_params.get('set_id', None)
+        
+        if set_id:
+            questions = MCQQuestion.objects.filter(question_set_id=set_id)
+        else:
+            questions = MCQQuestion.objects.all()
+        
         serializer = MCQQuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': questions.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
+        """إضافة سؤال جديد"""
         serializer = MCQQuestionSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم إضافة السؤال بنجاح',
+                'data': MCQQuestionSerializer(question).data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class MCQQuestionDetailView(APIView):
-    """عرض وتعديل وحذف سؤال MCQ"""
-    permission_classes = [IsAuthenticated]
-
+class MCQQuestionDetailAPIView(APIView):
+    """
+    GET: تفاصيل سؤال
+    PUT: تحديث سؤال
+    DELETE: حذف سؤال
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل السؤال"""
         question = get_object_or_404(MCQQuestion, pk=pk)
         serializer = MCQQuestionSerializer(question)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
-        question = get_object_or_404(MCQQuestion, pk=pk)
-        serializer = MCQQuestionSerializer(question, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
+        """تحديث السؤال"""
         question = get_object_or_404(MCQQuestion, pk=pk)
         serializer = MCQQuestionSerializer(question, data=request.data, partial=True)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم تحديث السؤال بنجاح',
+                'data': MCQQuestionSerializer(question).data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف السؤال"""
         question = get_object_or_404(MCQQuestion, pk=pk)
         question.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف السؤال بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # Reading Passage Views
 # ============================================
 
-class ReadingPassageListCreateView(APIView):
-    """قائمة وإنشاء قطع القراءة"""
-    permission_classes = [IsAuthenticated]
-
+class ReadingPassageListCreateAPIView(APIView):
+    """
+    GET: قائمة قطع القراءة
+    POST: إضافة قطعة جديدة
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        passages = ReadingPassage.objects.all()
-        placement_test_id = request.query_params.get('placement_test')
-        if placement_test_id:
-            passages = passages.filter(placement_test_id=placement_test_id)
+        """الحصول على قائمة القطع"""
+        test_id = request.query_params.get('test_id', None)
+        
+        if test_id:
+            passages = ReadingPassage.objects.filter(placement_test_id=test_id)
+        else:
+            passages = ReadingPassage.objects.all()
+        
         serializer = ReadingPassageSerializer(passages, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': passages.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
-        serializer = ReadingPassageSerializer(data=request.data)
+        """إضافة قطعة جديدة"""
+        serializer = ReadingPassageCreateSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            passage = serializer.save()
+            detail_serializer = ReadingPassageSerializer(passage)
+            return Response({
+                'success': True,
+                'message': 'تم إضافة القطعة بنجاح',
+                'data': detail_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ReadingPassageDetailView(APIView):
-    """عرض وتعديل وحذف قطعة قراءة"""
-    permission_classes = [IsAuthenticated]
-
+class ReadingPassageDetailAPIView(APIView):
+    """
+    GET: تفاصيل قطعة قراءة
+    PUT: تحديث قطعة
+    DELETE: حذف قطعة
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل القطعة"""
         passage = get_object_or_404(ReadingPassage, pk=pk)
         serializer = ReadingPassageSerializer(passage)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
+        """تحديث القطعة"""
         passage = get_object_or_404(ReadingPassage, pk=pk)
-        serializer = ReadingPassageSerializer(passage, data=request.data)
+        serializer = ReadingPassageCreateSerializer(
+            passage, 
+            data=request.data, 
+            partial=True
+        )
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        passage = get_object_or_404(ReadingPassage, pk=pk)
-        serializer = ReadingPassageSerializer(passage, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            passage = serializer.save()
+            detail_serializer = ReadingPassageSerializer(passage)
+            return Response({
+                'success': True,
+                'message': 'تم تحديث القطعة بنجاح',
+                'data': detail_serializer.data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف القطعة"""
         passage = get_object_or_404(ReadingPassage, pk=pk)
         passage.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف القطعة بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # Reading Question Views
 # ============================================
 
-class ReadingQuestionListCreateView(APIView):
-    """قائمة وإنشاء أسئلة القراءة"""
-    permission_classes = [IsAuthenticated]
-
+class ReadingQuestionListCreateAPIView(APIView):
+    """
+    GET: قائمة أسئلة القراءة
+    POST: إضافة سؤال جديد
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        questions = ReadingQuestion.objects.all()
-        passage_id = request.query_params.get('passage')
+        """الحصول على قائمة الأسئلة"""
+        passage_id = request.query_params.get('passage_id', None)
+        
         if passage_id:
-            questions = questions.filter(passage_id=passage_id)
+            questions = ReadingQuestion.objects.filter(passage_id=passage_id)
+        else:
+            questions = ReadingQuestion.objects.all()
+        
         serializer = ReadingQuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': questions.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
+        """إضافة سؤال جديد"""
         serializer = ReadingQuestionSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم إضافة السؤال بنجاح',
+                'data': ReadingQuestionSerializer(question).data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ReadingQuestionDetailView(APIView):
-    """عرض وتعديل وحذف سؤال قراءة"""
-    permission_classes = [IsAuthenticated]
-
+class ReadingQuestionDetailAPIView(APIView):
+    """
+    GET: تفاصيل سؤال قراءة
+    PUT: تحديث سؤال
+    DELETE: حذف سؤال
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل السؤال"""
         question = get_object_or_404(ReadingQuestion, pk=pk)
         serializer = ReadingQuestionSerializer(question)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
+        """تحديث السؤال"""
         question = get_object_or_404(ReadingQuestion, pk=pk)
-        serializer = ReadingQuestionSerializer(question, data=request.data)
+        serializer = ReadingQuestionSerializer(
+            question, 
+            data=request.data, 
+            partial=True
+        )
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        question = get_object_or_404(ReadingQuestion, pk=pk)
-        serializer = ReadingQuestionSerializer(question, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم تحديث السؤال بنجاح',
+                'data': ReadingQuestionSerializer(question).data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف السؤال"""
         question = get_object_or_404(ReadingQuestion, pk=pk)
         question.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف السؤال بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # Listening Audio Views
 # ============================================
 
-class ListeningAudioListCreateView(APIView):
-    """قائمة وإنشاء التسجيلات الصوتية"""
-    permission_classes = [IsAuthenticated]
-
+class ListeningAudioListCreateAPIView(APIView):
+    """
+    GET: قائمة التسجيلات الصوتية
+    POST: إضافة تسجيل جديد
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        audios = ListeningAudio.objects.all()
-        placement_test_id = request.query_params.get('placement_test')
-        if placement_test_id:
-            audios = audios.filter(placement_test_id=placement_test_id)
+        """الحصول على قائمة التسجيلات"""
+        test_id = request.query_params.get('test_id', None)
+        
+        if test_id:
+            audios = ListeningAudio.objects.filter(placement_test_id=test_id)
+        else:
+            audios = ListeningAudio.objects.all()
+        
         serializer = ListeningAudioSerializer(audios, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': audios.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
-        serializer = ListeningAudioSerializer(data=request.data)
+        """إضافة تسجيل جديد"""
+        serializer = ListeningAudioCreateSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            audio = serializer.save()
+            detail_serializer = ListeningAudioSerializer(audio)
+            return Response({
+                'success': True,
+                'message': 'تم إضافة التسجيل بنجاح',
+                'data': detail_serializer.data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ListeningAudioDetailView(APIView):
-    """عرض وتعديل وحذف تسجيل صوتي"""
-    permission_classes = [IsAuthenticated]
-
+class ListeningAudioDetailAPIView(APIView):
+    """
+    GET: تفاصيل تسجيل صوتي
+    PUT: تحديث تسجيل
+    DELETE: حذف تسجيل
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل التسجيل"""
         audio = get_object_or_404(ListeningAudio, pk=pk)
         serializer = ListeningAudioSerializer(audio)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
+        """تحديث التسجيل"""
         audio = get_object_or_404(ListeningAudio, pk=pk)
-        serializer = ListeningAudioSerializer(audio, data=request.data)
+        serializer = ListeningAudioCreateSerializer(
+            audio, 
+            data=request.data, 
+            partial=True
+        )
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        audio = get_object_or_404(ListeningAudio, pk=pk)
-        serializer = ListeningAudioSerializer(audio, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            audio = serializer.save()
+            detail_serializer = ListeningAudioSerializer(audio)
+            return Response({
+                'success': True,
+                'message': 'تم تحديث التسجيل بنجاح',
+                'data': detail_serializer.data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف التسجيل"""
         audio = get_object_or_404(ListeningAudio, pk=pk)
         audio.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف التسجيل بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # Listening Question Views
 # ============================================
 
-class ListeningQuestionListCreateView(APIView):
-    """قائمة وإنشاء أسئلة الاستماع"""
-    permission_classes = [IsAuthenticated]
-
+class ListeningQuestionListCreateAPIView(APIView):
+    """
+    GET: قائمة أسئلة الاستماع
+    POST: إضافة سؤال جديد
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        questions = ListeningQuestion.objects.all()
-        audio_id = request.query_params.get('audio')
+        """الحصول على قائمة الأسئلة"""
+        audio_id = request.query_params.get('audio_id', None)
+        
         if audio_id:
-            questions = questions.filter(audio_id=audio_id)
+            questions = ListeningQuestion.objects.filter(audio_id=audio_id)
+        else:
+            questions = ListeningQuestion.objects.all()
+        
         serializer = ListeningQuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'count': questions.count(),
+            'data': serializer.data
+        })
+    
     def post(self, request):
+        """إضافة سؤال جديد"""
         serializer = ListeningQuestionSerializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم إضافة السؤال بنجاح',
+                'data': ListeningQuestionSerializer(question).data
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ListeningQuestionDetailView(APIView):
-    """عرض وتعديل وحذف سؤال استماع"""
-    permission_classes = [IsAuthenticated]
-
+class ListeningQuestionDetailAPIView(APIView):
+    """
+    GET: تفاصيل سؤال استماع
+    PUT: تحديث سؤال
+    DELETE: حذف سؤال
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
+        """الحصول على تفاصيل السؤال"""
         question = get_object_or_404(ListeningQuestion, pk=pk)
         serializer = ListeningQuestionSerializer(question)
-        return Response(serializer.data)
-
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
+    
     def put(self, request, pk):
+        """تحديث السؤال"""
         question = get_object_or_404(ListeningQuestion, pk=pk)
-        serializer = ListeningQuestionSerializer(question, data=request.data)
+        serializer = ListeningQuestionSerializer(
+            question, 
+            data=request.data, 
+            partial=True
+        )
+        
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        question = get_object_or_404(ListeningQuestion, pk=pk)
-        serializer = ListeningQuestionSerializer(question, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم تحديث السؤال بنجاح',
+                'data': ListeningQuestionSerializer(question).data
+            })
+        
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
+        """حذف السؤال"""
         question = get_object_or_404(ListeningQuestion, pk=pk)
         question.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({
+            'success': True,
+            'message': 'تم حذف السؤال بنجاح'
+        }, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
-# Speaking Video Views
+# Speaking Video Views (نفس النمط)
 # ============================================
 
-class SpeakingVideoListCreateView(APIView):
-    """قائمة وإنشاء فيديوهات التحدث"""
-    permission_classes = [IsAuthenticated]
-
+class SpeakingVideoListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        videos = SpeakingVideo.objects.all()
-        placement_test_id = request.query_params.get('placement_test')
-        if placement_test_id:
-            videos = videos.filter(placement_test_id=placement_test_id)
+        test_id = request.query_params.get('test_id', None)
+        if test_id:
+            videos = SpeakingVideo.objects.filter(placement_test_id=test_id)
+        else:
+            videos = SpeakingVideo.objects.all()
+        
         serializer = SpeakingVideoSerializer(videos, many=True)
-        return Response(serializer.data)
-
+        return Response({'success': True, 'count': videos.count(), 'data': serializer.data})
+    
     def post(self, request):
-        serializer = SpeakingVideoSerializer(data=request.data)
+        serializer = SpeakingVideoCreateSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            video = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم إضافة الفيديو بنجاح',
+                'data': SpeakingVideoSerializer(video).data
+            }, status=status.HTTP_201_CREATED)
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class SpeakingVideoDetailView(APIView):
-    """عرض وتعديل وحذف فيديو تحدث"""
-    permission_classes = [IsAuthenticated]
-
+class SpeakingVideoDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
         video = get_object_or_404(SpeakingVideo, pk=pk)
-        serializer = SpeakingVideoSerializer(video)
-        return Response(serializer.data)
-
+        return Response({'success': True, 'data': SpeakingVideoSerializer(video).data})
+    
     def put(self, request, pk):
         video = get_object_or_404(SpeakingVideo, pk=pk)
-        serializer = SpeakingVideoSerializer(video, data=request.data)
+        serializer = SpeakingVideoCreateSerializer(video, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
-        video = get_object_or_404(SpeakingVideo, pk=pk)
-        serializer = SpeakingVideoSerializer(video, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            video = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم تحديث الفيديو بنجاح',
+                'data': SpeakingVideoSerializer(video).data
+            })
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
         video = get_object_or_404(SpeakingVideo, pk=pk)
         video.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'success': True, 'message': 'تم حذف الفيديو بنجاح'}, status=status.HTTP_204_NO_CONTENT)
 
 
-# ============================================
-# Speaking Question Views
-# ============================================
-
-class SpeakingQuestionListCreateView(APIView):
-    """قائمة وإنشاء أسئلة التحدث"""
-    permission_classes = [IsAuthenticated]
-
+class SpeakingQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        questions = SpeakingQuestion.objects.all()
-        video_id = request.query_params.get('video')
+        video_id = request.query_params.get('video_id', None)
         if video_id:
-            questions = questions.filter(video_id=video_id)
+            questions = SpeakingQuestion.objects.filter(video_id=video_id)
+        else:
+            questions = SpeakingQuestion.objects.all()
+        
         serializer = SpeakingQuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-
+        return Response({'success': True, 'count': questions.count(), 'data': serializer.data})
+    
     def post(self, request):
         serializer = SpeakingQuestionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم إضافة السؤال بنجاح',
+                'data': SpeakingQuestionSerializer(question).data
+            }, status=status.HTTP_201_CREATED)
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class SpeakingQuestionDetailView(APIView):
-    """عرض وتعديل وحذف سؤال تحدث"""
-    permission_classes = [IsAuthenticated]
-
+class SpeakingQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
         question = get_object_or_404(SpeakingQuestion, pk=pk)
-        serializer = SpeakingQuestionSerializer(question)
-        return Response(serializer.data)
-
+        return Response({'success': True, 'data': SpeakingQuestionSerializer(question).data})
+    
     def put(self, request, pk):
-        question = get_object_or_404(SpeakingQuestion, pk=pk)
-        serializer = SpeakingQuestionSerializer(question, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
         question = get_object_or_404(SpeakingQuestion, pk=pk)
         serializer = SpeakingQuestionSerializer(question, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم تحديث السؤال بنجاح',
+                'data': SpeakingQuestionSerializer(question).data
+            })
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
         question = get_object_or_404(SpeakingQuestion, pk=pk)
         question.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'success': True, 'message': 'تم حذف السؤال بنجاح'}, status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================
 # Writing Question Views
 # ============================================
 
-class WritingQuestionListCreateView(APIView):
-    """قائمة وإنشاء أسئلة الكتابة"""
-    permission_classes = [IsAuthenticated]
-
+class WritingQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
-        questions = WritingQuestion.objects.all()
-        placement_test_id = request.query_params.get('placement_test')
-        if placement_test_id:
-            questions = questions.filter(placement_test_id=placement_test_id)
+        test_id = request.query_params.get('test_id', None)
+        if test_id:
+            questions = WritingQuestion.objects.filter(placement_test_id=test_id)
+        else:
+            questions = WritingQuestion.objects.all()
+        
         serializer = WritingQuestionSerializer(questions, many=True)
-        return Response(serializer.data)
-
+        return Response({'success': True, 'count': questions.count(), 'data': serializer.data})
+    
     def post(self, request):
         serializer = WritingQuestionSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم إضافة السؤال بنجاح',
+                'data': WritingQuestionSerializer(question).data
+            }, status=status.HTTP_201_CREATED)
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class WritingQuestionDetailView(APIView):
-    """عرض وتعديل وحذف سؤال كتابة"""
-    permission_classes = [IsAuthenticated]
-
+class WritingQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request, pk):
         question = get_object_or_404(WritingQuestion, pk=pk)
-        serializer = WritingQuestionSerializer(question)
-        return Response(serializer.data)
-
+        return Response({'success': True, 'data': WritingQuestionSerializer(question).data})
+    
     def put(self, request, pk):
-        question = get_object_or_404(WritingQuestion, pk=pk)
-        serializer = WritingQuestionSerializer(question, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk):
         question = get_object_or_404(WritingQuestion, pk=pk)
         serializer = WritingQuestionSerializer(question, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            question = serializer.save()
+            return Response({
+                'success': True,
+                'message': 'تم تحديث السؤال بنجاح',
+                'data': WritingQuestionSerializer(question).data
+            })
+        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    
     def delete(self, request, pk):
         question = get_object_or_404(WritingQuestion, pk=pk)
         question.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'success': True, 'message': 'تم حذف السؤال بنجاح'}, status=status.HTTP_204_NO_CONTENT)
