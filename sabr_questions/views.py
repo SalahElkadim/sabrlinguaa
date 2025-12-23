@@ -117,7 +117,7 @@ class PlacementTestDetailAPIView(APIView):
         return Response({
             'success': True,
             'message': 'تم حذف الامتحان بنجاح'
-        }, status=status.HTTP_204_NO_CONTENT)
+        }, status=status.HTTP_200_OK)
 
 
 # ============================================
