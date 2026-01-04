@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Sum
+import cloudinary.uploader
 
 from .models import (
     PlacementTest, MCQQuestionSet, MCQQuestion,
