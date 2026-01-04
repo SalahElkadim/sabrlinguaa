@@ -183,14 +183,25 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# إعدادات Cloudinary
+
+CLOUDINARY_CLOUD_NAME='dyxozpomy'
+CLOUDINARY_API_KEY='696649337799845'
+CLOUDINARY_API_SECRET='yomnU14sJiZhYV3gYr1xvdQGMPY'
+USE_L10N = False
+
+import cloudinary
+cloudinary.config(
+    cloud_name='dyxozpomy',
+    api_key='696649337799845',
+    api_secret='yomnU14sJiZhYV3gYr1xvdQGMPY'
+)
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
     'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 }
 # في آخر ملف settings.py
-
+CLOUDINARY_URL='cloudinary://696649337799845:yomnU14sJiZhYV3gYr1xvdQGMPY@dyxozpomy'
 # زود حجم الملفات المسموح برفعها
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
