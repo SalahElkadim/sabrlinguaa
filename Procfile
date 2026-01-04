@@ -1,1 +1,1 @@
-web: gunicorn sabrlingua.wsgi --log-file -
+web: gunicorn sabrlingua.wsgi --log-file - --timeout 300 --workers 4

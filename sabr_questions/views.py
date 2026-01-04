@@ -703,7 +703,7 @@ class ListeningQuestionDetailAPIView(APIView):
 
 class SpeakingVideoListCreateAPIView(APIView):
     permission_classes = [IsAdminUser]
-    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser]  # شيل JSONParser من هنا
     
     def get(self, request):
         test_id = request.query_params.get('test_id', None)
@@ -716,17 +716,47 @@ class SpeakingVideoListCreateAPIView(APIView):
         return Response({'success': True, 'count': videos.count(), 'data': serializer.data})
     
     def post(self, request):
-        serializer = SpeakingVideoCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            video = serializer.save()
+        try:
+            # ارفع الفيديو لـ Cloudinary مع timeout أطول
+            video_file = request.FILES.get('video_file')
+            if not video_file:
+                return Response({
+                    'success': False, 
+                    'errors': {'video_file': 'Video file is required'}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # رفع الفيديو مع timeout أطول
+            upload_result = cloudinary.uploader.upload(
+                video_file,
+                resource_type="video",
+                folder="speaking/videos",
+                timeout=300  # 5 دقائق
+            )
+            
+            # إضافة الـ URL للـ data
+            data = request.data.copy()
+            data['video_file'] = upload_result['secure_url']
+            
+            serializer = SpeakingVideoCreateSerializer(data=data)
+            if serializer.is_valid():
+                video = serializer.save()
+                return Response({
+                    'success': True,
+                    'message': 'تم إضافة الفيديو بنجاح',
+                    'data': SpeakingVideoSerializer(video).data
+                }, status=status.HTTP_201_CREATED)
+            
             return Response({
-                'success': True,
-                'message': 'تم إضافة الفيديو بنجاح',
-                'data': SpeakingVideoSerializer(video).data
-            }, status=status.HTTP_201_CREATED)
-        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
-
+                'success': False, 
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            return Response({
+                'success': False,
+                'errors': {'detail': str(e)}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
 class SpeakingVideoDetailAPIView(APIView):
     permission_classes = [IsAdminUser]
     parser_classes = [JSONParser, MultiPartParser, FormParser]

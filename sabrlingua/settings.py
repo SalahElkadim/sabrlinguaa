@@ -189,6 +189,14 @@ CLOUDINARY_STORAGE = {
     'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 }
+# في آخر ملف settings.py
+
+# زود حجم الملفات المسموح برفعها
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
+
+# للـ Cloudinary timeout
+CLOUDINARY_TIMEOUT = 300  # 5 دقائق
 
 # إعدادات الـ Media Files
 MEDIA_URL = '/media/'
