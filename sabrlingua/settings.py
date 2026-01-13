@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'sabr_questions',
     'cloudinary_storage',
     'cloudinary',
+    'levels',
 ]
 
 AUTH_USER_MODEL = 'sabr_auth.User'
