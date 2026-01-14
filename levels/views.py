@@ -1,6 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAdminUser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.shortcuts import get_object_or_404
 from .models import (
     Level, Unit, Section, Lesson, Exercise,
@@ -28,6 +30,8 @@ class LevelListCreateAPIView(APIView):
     GET: List all levels
     POST: Create new level
     """
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
         levels = Level.objects.all()
         serializer = LevelSerializer(levels, many=True)
@@ -47,6 +51,8 @@ class LevelDetailAPIView(APIView):
     PUT: Update level
     DELETE: Delete level
     """
+    permission_classes = [IsAdminUser]
+    
     def get_object(self, pk):
         return get_object_or_404(Level, pk=pk)
     
@@ -75,6 +81,8 @@ class LevelDetailAPIView(APIView):
 # ============================================
 
 class UnitListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
         units = Unit.objects.all()
         serializer = UnitSerializer(units, many=True)
@@ -89,6 +97,8 @@ class UnitListCreateAPIView(APIView):
 
 
 class UnitDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get_object(self, pk):
         return get_object_or_404(Unit, pk=pk)
     
@@ -117,6 +127,8 @@ class UnitDetailAPIView(APIView):
 # ============================================
 
 class SectionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
         sections = Section.objects.all()
         serializer = SectionSerializer(sections, many=True)
@@ -131,6 +143,8 @@ class SectionListCreateAPIView(APIView):
 
 
 class SectionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get_object(self, pk):
         return get_object_or_404(Section, pk=pk)
     
@@ -159,6 +173,8 @@ class SectionDetailAPIView(APIView):
 # ============================================
 
 class LessonListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
         lessons = Lesson.objects.all()
         serializer = LessonSerializer(lessons, many=True)
@@ -173,6 +189,8 @@ class LessonListCreateAPIView(APIView):
 
 
 class LessonDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get_object(self, pk):
         return get_object_or_404(Lesson, pk=pk)
     
@@ -201,6 +219,8 @@ class LessonDetailAPIView(APIView):
 # ============================================
 
 class ExerciseListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get(self, request):
         exercises = Exercise.objects.all()
         serializer = ExerciseSerializer(exercises, many=True)
@@ -215,6 +235,8 @@ class ExerciseListCreateAPIView(APIView):
 
 
 class ExerciseDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    
     def get_object(self, pk):
         return get_object_or_404(Exercise, pk=pk)
     
@@ -243,6 +265,9 @@ class ExerciseDetailAPIView(APIView):
 # ============================================
 
 class ExerciseMCQQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         questions = ExerciseMCQQuestion.objects.all()
         serializer = ExerciseMCQQuestionSerializer(questions, many=True)
@@ -257,6 +282,9 @@ class ExerciseMCQQuestionListCreateAPIView(APIView):
 
 
 class ExerciseMCQQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseMCQQuestion, pk=pk)
     
@@ -285,6 +313,9 @@ class ExerciseMCQQuestionDetailAPIView(APIView):
 # ============================================
 
 class ExerciseReadingPassageListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         passages = ExerciseReadingPassage.objects.all()
         serializer = ExerciseReadingPassageSerializer(passages, many=True)
@@ -299,6 +330,9 @@ class ExerciseReadingPassageListCreateAPIView(APIView):
 
 
 class ExerciseReadingPassageDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseReadingPassage, pk=pk)
     
@@ -327,6 +361,9 @@ class ExerciseReadingPassageDetailAPIView(APIView):
 # ============================================
 
 class ExerciseReadingQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         questions = ExerciseReadingQuestion.objects.all()
         serializer = ExerciseReadingQuestionSerializer(questions, many=True)
@@ -341,6 +378,9 @@ class ExerciseReadingQuestionListCreateAPIView(APIView):
 
 
 class ExerciseReadingQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseReadingQuestion, pk=pk)
     
@@ -369,6 +409,9 @@ class ExerciseReadingQuestionDetailAPIView(APIView):
 # ============================================
 
 class ExerciseListeningAudioListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         audios = ExerciseListeningAudio.objects.all()
         serializer = ExerciseListeningAudioSerializer(audios, many=True)
@@ -383,6 +426,9 @@ class ExerciseListeningAudioListCreateAPIView(APIView):
 
 
 class ExerciseListeningAudioDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseListeningAudio, pk=pk)
     
@@ -411,6 +457,9 @@ class ExerciseListeningAudioDetailAPIView(APIView):
 # ============================================
 
 class ExerciseListeningQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         questions = ExerciseListeningQuestion.objects.all()
         serializer = ExerciseListeningQuestionSerializer(questions, many=True)
@@ -425,6 +474,9 @@ class ExerciseListeningQuestionListCreateAPIView(APIView):
 
 
 class ExerciseListeningQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseListeningQuestion, pk=pk)
     
@@ -453,6 +505,9 @@ class ExerciseListeningQuestionDetailAPIView(APIView):
 # ============================================
 
 class ExerciseSpeakingVideoListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         videos = ExerciseSpeakingVideo.objects.all()
         serializer = ExerciseSpeakingVideoSerializer(videos, many=True)
@@ -467,6 +522,9 @@ class ExerciseSpeakingVideoListCreateAPIView(APIView):
 
 
 class ExerciseSpeakingVideoDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseSpeakingVideo, pk=pk)
     
@@ -495,6 +553,9 @@ class ExerciseSpeakingVideoDetailAPIView(APIView):
 # ============================================
 
 class ExerciseSpeakingQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         questions = ExerciseSpeakingQuestion.objects.all()
         serializer = ExerciseSpeakingQuestionSerializer(questions, many=True)
@@ -509,6 +570,9 @@ class ExerciseSpeakingQuestionListCreateAPIView(APIView):
 
 
 class ExerciseSpeakingQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseSpeakingQuestion, pk=pk)
     
@@ -537,6 +601,9 @@ class ExerciseSpeakingQuestionDetailAPIView(APIView):
 # ============================================
 
 class ExerciseWritingQuestionListCreateAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get(self, request):
         questions = ExerciseWritingQuestion.objects.all()
         serializer = ExerciseWritingQuestionSerializer(questions, many=True)
@@ -551,6 +618,9 @@ class ExerciseWritingQuestionListCreateAPIView(APIView):
 
 
 class ExerciseWritingQuestionDetailAPIView(APIView):
+    permission_classes = [IsAdminUser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    
     def get_object(self, pk):
         return get_object_or_404(ExerciseWritingQuestion, pk=pk)
     
