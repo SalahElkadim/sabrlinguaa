@@ -697,92 +697,279 @@ class ListeningQuestionDetailAPIView(APIView):
             'message': 'تم حذف السؤال بنجاح'
         }, status=status.HTTP_204_NO_CONTENT)
 
-
 # ============================================
-# Speaking Video Views (نفس النمط)
+# Speaking Video Views - النسخة المُصلحة
 # ============================================
 
 class SpeakingVideoListCreateAPIView(APIView):
+    """
+    GET: قائمة الفيديوهات
+    POST: إضافة فيديو جديد
+    """
     permission_classes = [IsAdminUser]
-    parser_classes = [MultiPartParser, FormParser]  # شيل JSONParser من هنا
+    parser_classes = [MultiPartParser, FormParser]
     
     def get(self, request):
+        """الحصول على قائمة الفيديوهات"""
         test_id = request.query_params.get('test_id', None)
+        
         if test_id:
             videos = SpeakingVideo.objects.filter(placement_test_id=test_id)
         else:
             videos = SpeakingVideo.objects.all()
         
         serializer = SpeakingVideoSerializer(videos, many=True)
-        return Response({'success': True, 'count': videos.count(), 'data': serializer.data})
+        return Response({
+            'success': True,
+            'count': videos.count(),
+            'data': serializer.data
+        })
     
     def post(self, request):
+        """إضافة فيديو جديد"""
         try:
-            # ارفع الفيديو لـ Cloudinary مع timeout أطول
+            # طباعة البيانات المُستلمة للتشخيص
+            print("📥 Request Data:", request.data)
+            print("📁 Request Files:", request.FILES)
+            
+            # التحقق من وجود ملف الفيديو
             video_file = request.FILES.get('video_file')
             if not video_file:
                 return Response({
-                    'success': False, 
-                    'errors': {'video_file': 'Video file is required'}
+                    'success': False,
+                    'errors': {'video_file': ['Video file is required']}
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # رفع الفيديو مع timeout أطول
+            # رفع الفيديو لـ Cloudinary مع إعدادات محسّنة
+            print(f"📤 Uploading video: {video_file.name} ({video_file.size} bytes)")
+            
             upload_result = cloudinary.uploader.upload(
                 video_file,
                 resource_type="video",
                 folder="speaking/videos",
-                timeout=300  # 5 دقائق
+                timeout=600,  # 10 دقائق
+                chunk_size=6000000,  # 6MB chunks
+                eager=[
+                    {"quality": "auto", "fetch_format": "auto"}
+                ],
+                eager_async=True
             )
             
-            # إضافة الـ URL للـ data
-            data = request.data.copy()
-            data['video_file'] = upload_result['secure_url']
+            print(f"✅ Video uploaded: {upload_result['secure_url']}")
             
+            # معالجة الـ thumbnail إذا كان موجود
+            thumbnail_url = None
+            thumbnail_file = request.FILES.get('thumbnail')
+            if thumbnail_file:
+                print(f"📤 Uploading thumbnail: {thumbnail_file.name}")
+                thumbnail_result = cloudinary.uploader.upload(
+                    thumbnail_file,
+                    resource_type="image",
+                    folder="speaking/thumbnails",
+                    timeout=120
+                )
+                thumbnail_url = thumbnail_result['secure_url']
+                print(f"✅ Thumbnail uploaded: {thumbnail_url}")
+            
+            # تجهيز البيانات للحفظ
+            data = {
+                'placement_test': request.data.get('placement_test'),
+                'title': request.data.get('title'),
+                'video_file': upload_result['secure_url'],
+                'description': request.data.get('description', ''),
+                'duration': request.data.get('duration', ''),
+                'order': request.data.get('order', 1),
+                'is_active': request.data.get('is_active', 'true').lower() == 'true'
+            }
+            
+            # إضافة الـ thumbnail إذا كان موجود
+            if thumbnail_url:
+                data['thumbnail'] = thumbnail_url
+            
+            print("💾 Data to save:", data)
+            
+            # حفظ البيانات
             serializer = SpeakingVideoCreateSerializer(data=data)
+            
             if serializer.is_valid():
                 video = serializer.save()
+                print(f"✅ Video saved with ID: {video.id}")
+                
                 return Response({
                     'success': True,
                     'message': 'تم إضافة الفيديو بنجاح',
                     'data': SpeakingVideoSerializer(video).data
                 }, status=status.HTTP_201_CREATED)
-            
-            return Response({
-                'success': False, 
-                'errors': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
-        except Exception as e:
+            else:
+                print("❌ Serializer errors:", serializer.errors)
+                return Response({
+                    'success': False,
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except cloudinary.exceptions.Error as e:
+            print(f"❌ Cloudinary Error: {str(e)}")
             return Response({
                 'success': False,
-                'errors': {'detail': str(e)}
+                'errors': {'cloudinary': [f'خطأ في رفع الفيديو: {str(e)}']}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+            
+        except Exception as e:
+            print(f"❌ Unexpected Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({
+                'success': False,
+                'errors': {'detail': [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class SpeakingVideoDetailAPIView(APIView):
+    """
+    GET: تفاصيل فيديو
+    PUT: تحديث فيديو
+    DELETE: حذف فيديو
+    """
     permission_classes = [IsAdminUser]
-    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser]
     
     def get(self, request, pk):
+        """الحصول على تفاصيل الفيديو"""
         video = get_object_or_404(SpeakingVideo, pk=pk)
-        return Response({'success': True, 'data': SpeakingVideoSerializer(video).data})
+        serializer = SpeakingVideoSerializer(video)
+        return Response({
+            'success': True,
+            'data': serializer.data
+        })
     
     def put(self, request, pk):
-        video = get_object_or_404(SpeakingVideo, pk=pk)
-        serializer = SpeakingVideoCreateSerializer(video, data=request.data, partial=True)
-        if serializer.is_valid():
-            video = serializer.save()
+        """تحديث الفيديو"""
+        try:
+            video = get_object_or_404(SpeakingVideo, pk=pk)
+            
+            print("📥 Update Request Data:", request.data)
+            print("📁 Update Request Files:", request.FILES)
+            
+            # تجهيز البيانات
+            data = {
+                'placement_test': request.data.get('placement_test', video.placement_test_id),
+                'title': request.data.get('title', video.title),
+                'description': request.data.get('description', video.description),
+                'duration': request.data.get('duration', video.duration),
+                'order': request.data.get('order', video.order),
+                'is_active': request.data.get('is_active', str(video.is_active)).lower() == 'true'
+            }
+            
+            # رفع فيديو جديد إذا كان موجود
+            video_file = request.FILES.get('video_file')
+            if video_file:
+                print(f"📤 Uploading new video: {video_file.name}")
+                upload_result = cloudinary.uploader.upload(
+                    video_file,
+                    resource_type="video",
+                    folder="speaking/videos",
+                    timeout=600,
+                    chunk_size=6000000
+                )
+                data['video_file'] = upload_result['secure_url']
+                print(f"✅ New video uploaded: {upload_result['secure_url']}")
+            else:
+                data['video_file'] = video.video_file
+            
+            # رفع thumbnail جديد إذا كان موجود
+            thumbnail_file = request.FILES.get('thumbnail')
+            if thumbnail_file:
+                print(f"📤 Uploading new thumbnail: {thumbnail_file.name}")
+                thumbnail_result = cloudinary.uploader.upload(
+                    thumbnail_file,
+                    resource_type="image",
+                    folder="speaking/thumbnails",
+                    timeout=120
+                )
+                data['thumbnail'] = thumbnail_result['secure_url']
+                print(f"✅ New thumbnail uploaded: {thumbnail_result['secure_url']}")
+            elif video.thumbnail:
+                data['thumbnail'] = video.thumbnail
+            
+            print("💾 Data to update:", data)
+            
+            # تحديث البيانات
+            serializer = SpeakingVideoCreateSerializer(
+                video,
+                data=data,
+                partial=True
+            )
+            
+            if serializer.is_valid():
+                updated_video = serializer.save()
+                print(f"✅ Video updated: {updated_video.id}")
+                
+                return Response({
+                    'success': True,
+                    'message': 'تم تحديث الفيديو بنجاح',
+                    'data': SpeakingVideoSerializer(updated_video).data
+                })
+            else:
+                print("❌ Serializer errors:", serializer.errors)
+                return Response({
+                    'success': False,
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            print(f"❌ Update Error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return Response({
-                'success': True,
-                'message': 'تم تحديث الفيديو بنجاح',
-                'data': SpeakingVideoSerializer(video).data
-            })
-        return Response({'success': False, 'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+                'success': False,
+                'errors': {'detail': [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def delete(self, request, pk):
+        """حذف الفيديو"""
         video = get_object_or_404(SpeakingVideo, pk=pk)
-        video.delete()
-        return Response({'success': True, 'message': 'تم حذف الفيديو بنجاح'}, status=status.HTTP_204_NO_CONTENT)
-
+        
+        try:
+            # حذف الفيديو من Cloudinary إذا كان موجود
+            if video.video_file:
+                # استخراج public_id من URL
+                video_url = str(video.video_file)
+                if 'cloudinary.com' in video_url:
+                    try:
+                        public_id = video_url.split('/')[-1].split('.')[0]
+                        folder_path = 'speaking/videos/' + public_id
+                        cloudinary.uploader.destroy(folder_path, resource_type='video')
+                        print(f"🗑️ Deleted video from Cloudinary: {folder_path}")
+                    except Exception as e:
+                        print(f"⚠️ Could not delete video from Cloudinary: {e}")
+            
+            # حذف thumbnail من Cloudinary إذا كان موجود
+            if video.thumbnail:
+                thumbnail_url = str(video.thumbnail)
+                if 'cloudinary.com' in thumbnail_url:
+                    try:
+                        public_id = thumbnail_url.split('/')[-1].split('.')[0]
+                        folder_path = 'speaking/thumbnails/' + public_id
+                        cloudinary.uploader.destroy(folder_path)
+                        print(f"🗑️ Deleted thumbnail from Cloudinary: {folder_path}")
+                    except Exception as e:
+                        print(f"⚠️ Could not delete thumbnail from Cloudinary: {e}")
+            
+            # حذف السجل من قاعدة البيانات
+            video.delete()
+            print(f"✅ Video deleted from database: ID {pk}")
+            
+            return Response({
+                'success': True,
+                'message': 'تم حذف الفيديو بنجاح'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ Delete Error: {str(e)}")
+            return Response({
+                'success': False,
+                'errors': {'detail': [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class SpeakingQuestionListCreateAPIView(APIView):
     permission_classes = [IsAdminUser]
