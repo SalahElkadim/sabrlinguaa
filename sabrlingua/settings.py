@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import dj_database_url
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
@@ -12,9 +13,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
-
+#DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = True
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+
+OPENAI_API_KEY =os.getenv('OPENAI_API_KEY')  # من .env
+
+
+AI_GRADING_CONFIG = {
+    'model': os.getenv('AI_GRADING_MODEL', 'gpt-4o-mini'),
+    'temperature': float(os.getenv('AI_GRADING_TEMPERATURE', '0.3')),
+    'max_tokens': int(os.getenv('AI_GRADING_MAX_TOKENS', '1000')),
+}
 
 # Application definition
 INSTALLED_APPS = [
@@ -33,6 +43,7 @@ INSTALLED_APPS = [
     'sabr_questions',
     'cloudinary_storage',
     'cloudinary',
+    'placement_test',
     'levels',
 ]
 
@@ -121,10 +132,31 @@ MIDDLEWARE = [
 
 # CORS Settings
 CORS_ALLOWED_ORIGINS = [
-    os.getenv('FRONTEND_URL', 'http://localhost:3000'),
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    os.getenv('FRONTEND_URL', 'https://sabrlinguafront-production.up.railway.app'),
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
-
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 ROOT_URLCONF = 'sabrlingua.urls'
 

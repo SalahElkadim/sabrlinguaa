@@ -4,110 +4,30 @@ from cloudinary.models import CloudinaryField
 
 
 # ============================================
-# Placement Test Model
+# Abstract Base Models
 # ============================================
 
-class PlacementTest(models.Model):
+class TimeStampedModel(models.Model):
     """
-    نموذج امتحان تحديد المستوى
+    نموذج أساسي للـ timestamps
     """
-    title = models.CharField(max_length=200, verbose_name="عنوان الامتحان")
-    description = models.TextField(blank=True, null=True, verbose_name="وصف الامتحان")
-    
-    # المدة الزمنية
-    duration_minutes = models.PositiveIntegerField(
-        verbose_name="مدة الامتحان (بالدقائق)",
-        help_text="المدة الزمنية المحددة لإنهاء الامتحان"
-    )
-    
-    # درجات النجاح للمستويات
-    a1_min_score = models.PositiveIntegerField(
-        default=0,
-        verbose_name="الحد الأدنى لمستوى A1",
-        help_text="من 0 إلى هذه الدرجة = A1"
-    )
-    a2_min_score = models.PositiveIntegerField(
-        verbose_name="الحد الأدنى لمستوى A2",
-        help_text="من الدرجة السابقة إلى هذه الدرجة = A2"
-    )
-    b1_min_score = models.PositiveIntegerField(
-        verbose_name="الحد الأدنى لمستوى B1",
-        help_text="من الدرجة السابقة إلى هذه الدرجة = B1"
-    )
-    b2_min_score = models.PositiveIntegerField(
-        verbose_name="الحد الأدنى لمستوى B2",
-        help_text="من الدرجة السابقة فما فوق = B2"
-    )
-    
-    # الحالة
-    is_active = models.BooleanField(default=False, verbose_name="نشط")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="تاريخ التحديث")
     
     class Meta:
-        verbose_name = "امتحان تحديد المستوى"
-        verbose_name_plural = "امتحانات تحديد المستوى"
-        ordering = ['-created_at']
-    
-    def __str__(self):
-        return self.title
-    
-    def get_total_points(self):
-        """حساب مجموع النقاط الكلي للامتحان"""
-        total = 0
-        
-        # MCQ Questions
-        for mcq_set in self.mcq_sets.all():
-            total += sum(q.points for q in mcq_set.questions.all())
-        
-        # Reading Questions
-        for passage in self.reading_passages.all():
-            total += sum(q.points for q in passage.questions.all())
-        
-        # Listening Questions
-        for audio in self.listening_audios.all():
-            total += sum(q.points for q in audio.questions.all())
-        
-        # Speaking Questions
-        for video in self.speaking_videos.all():
-            total += sum(q.points for q in video.questions.all())
-        
-        # Writing Questions
-        total += sum(q.points for q in self.writing_questions.all())
-        
-        return total
-    
-    def get_questions_count(self):
-        """حساب عدد الأسئلة الكلي"""
-        count = 0
-        count += sum(mcq_set.questions.count() for mcq_set in self.mcq_sets.all())
-        count += sum(passage.questions.count() for passage in self.reading_passages.all())
-        count += sum(audio.questions.count() for audio in self.listening_audios.all())
-        count += sum(video.questions.count() for video in self.speaking_videos.all())
-        count += self.writing_questions.count()
-        return count
+        abstract = True
 
 
-# ============================================
-# Abstract Base Models (النماذج الأساسية)
-# ============================================
-
-class BaseQuestion(models.Model):
+class OrderedModel(models.Model):
     """
-    نموذج أساسي مشترك لكل الأسئلة
+    نموذج أساسي للترتيب والتفعيل
     """
-    title = models.CharField(max_length=500, verbose_name="عنوان السؤال")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="تاريخ التحديث")
     order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
     is_active = models.BooleanField(default=True, verbose_name="نشط")
     
     class Meta:
         abstract = True
-        ordering = ['order', 'created_at']
-    
-    def __str__(self):
-        return self.title
+        ordering = ['order', 'id']
 
 
 class BaseMCQQuestion(models.Model):
@@ -116,10 +36,9 @@ class BaseMCQQuestion(models.Model):
     """
     question_text = models.TextField(verbose_name="نص السؤال")
     question_image = CloudinaryField(
-        'image', 
-        blank=True, 
-        null=True,
-        folder='questions/images'
+        verbose_name="صورة السؤال",
+        blank=True,
+        null=True
     )
     
     # الاختيارات
@@ -136,13 +55,13 @@ class BaseMCQQuestion(models.Model):
         ('D', 'د'),
     ]
     correct_answer = models.CharField(
-        max_length=1, 
+        max_length=1,
         choices=CHOICES,
         verbose_name="الإجابة الصحيحة"
     )
     
     explanation = models.TextField(
-        blank=True, 
+        blank=True,
         null=True,
         verbose_name="شرح الإجابة"
     )
@@ -153,9 +72,6 @@ class BaseMCQQuestion(models.Model):
         verbose_name="النقاط"
     )
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
     class Meta:
         abstract = True
     
@@ -164,71 +80,240 @@ class BaseMCQQuestion(models.Model):
 
 
 # ============================================
-# MCQ Questions (أسئلة الاختيار من متعدد المستقلة)
+# Usage Type Mixin (لإعادة الاستخدام)
+# ============================================
+class UsageTypeMixin(models.Model):
+    """
+    Mixin لإضافة usage_type والـ Foreign Keys للاختبارات المختلفة
+    """
+    USAGE_TYPE_CHOICES = [
+        ('QUESTION_BANK', 'Question Bank'),
+        ('PLACEMENT', 'Placement Test'),
+        ('LESSON', 'Lesson Content'),        # 🆕 للأسئلة المحلولة في الدروس
+        ('UNIT_EXAM', 'Unit Exam'),          # 🆕 امتحان الوحدة
+        ('LEVEL_EXAM', 'Level Exam'),        # 🆕 امتحان المستوى
+        ('GENERAL', 'General Use'),
+    ]
+    
+    usage_type = models.CharField(
+        max_length=20,
+        choices=USAGE_TYPE_CHOICES,
+        default='QUESTION_BANK',
+        verbose_name="نوع الاستخدام",
+        db_index=True
+    )
+    
+    # ============================================
+    # Foreign Keys للاختبارات المختلفة
+    # ============================================
+    
+    # Existing FK (موجود بالفعل)
+    placement_test = models.ForeignKey(
+        'placement_test.PlacementTest',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="اختبار تحديد المستوى"
+    )
+    
+    # 🆕 NEW: Foreign Keys للـ Levels System
+    lesson = models.ForeignKey(
+        'levels.Lesson',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="الدرس",
+        help_text="للأسئلة المحلولة في الدروس (usage_type=LESSON)"
+    )
+    
+    unit_exam = models.ForeignKey(
+        'levels.UnitExam',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="امتحان الوحدة",
+        help_text="لأسئلة امتحان الوحدة (usage_type=UNIT_EXAM)"
+    )
+    
+    level_exam = models.ForeignKey(
+        'levels.LevelExam',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="امتحان المستوى",
+        help_text="لأسئلة امتحان المستوى (usage_type=LEVEL_EXAM)"
+    )
+    
+    class Meta:
+        abstract = True
+
+
+# ============================================
+# Vocabulary Questions (أسئلة المفردات)
 # ============================================
 
-class MCQQuestionSet(BaseQuestion):
+class VocabularyQuestionSet(TimeStampedModel, OrderedModel):
     """
-    مجموعة أسئلة MCQ (النموذج الأب)
+    مجموعة أسئلة المفردات
     """
-    placement_test = models.ForeignKey(
-        PlacementTest,
-        on_delete=models.CASCADE,
-        related_name='mcq_sets',
-        verbose_name="امتحان تحديد المستوى"
-    )
+    title = models.CharField(max_length=200, verbose_name="عنوان المجموعة")
     description = models.TextField(
-        blank=True, 
+        blank=True,
         null=True,
         verbose_name="وصف المجموعة"
     )
     
+    # ✅ إضافة usage_type للـ Set
+    USAGE_TYPE_CHOICES = [
+        ('QUESTION_BANK', 'Question Bank'),
+        ('PLACEMENT', 'Placement Test'),
+        ('STEP', 'Learning Step'),
+        ('IELTS', 'IELTS Exam'),
+        ('LEVEL', 'Level Test'),
+        ('GENERAL', 'General Use'),
+    ]
+    
+    usage_type = models.CharField(
+        max_length=20,
+        choices=USAGE_TYPE_CHOICES,
+        default='QUESTION_BANK',
+        verbose_name="نوع الاستخدام"
+    )
+    
     class Meta:
-        verbose_name = "مجموعة أسئلة MCQ"
-        verbose_name_plural = "مجموعات أسئلة MCQ"
-        ordering = ['placement_test', 'order', 'created_at']
+        verbose_name = "مجموعة أسئلة مفردات"
+        verbose_name_plural = "مجموعات أسئلة المفردات"
+        ordering = ['order', 'created_at']
+    
+    def __str__(self):
+        return self.title
+    
+    def get_questions_count(self):
+        """عدد الأسئلة"""
+        return self.questions.count()
 
 
-class MCQQuestion(BaseMCQQuestion):
+class VocabularyQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel, UsageTypeMixin):
     """
-    سؤال MCQ فردي (النموذج الابن)
+    سؤال مفردات
     """
     question_set = models.ForeignKey(
-        MCQQuestionSet,
+        VocabularyQuestionSet,
         on_delete=models.CASCADE,
         related_name='questions',
         verbose_name="مجموعة الأسئلة"
     )
-    order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
+    
+    # ✅ إضافة question_bank
+    question_bank = models.ForeignKey(
+        'placement_test.QuestionBank',
+        on_delete=models.CASCADE,
+        related_name='vocabulary_questions',
+        null=True,  
+        blank=True,
+        verbose_name="بنك الأسئلة"
+    )
     
     class Meta:
-        verbose_name = "سؤال MCQ"
-        verbose_name_plural = "أسئلة MCQ"
+        verbose_name = "سؤال مفردات"
+        verbose_name_plural = "أسئلة المفردات"
         ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['usage_type', 'placement_test']),
+        ]
+
+
+# ============================================
+# Grammar Questions (أسئلة القواعد)
+# ============================================
+
+class GrammarQuestionSet(TimeStampedModel, OrderedModel):
+    """
+    مجموعة أسئلة القواعد
+    """
+    title = models.CharField(max_length=200, verbose_name="عنوان المجموعة")
+    description = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="وصف المجموعة"
+    )
+    
+    USAGE_TYPE_CHOICES = [
+        ('QUESTION_BANK', 'Question Bank'),
+        ('PLACEMENT', 'Placement Test'),
+        ('STEP', 'Learning Step'),
+        ('IELTS', 'IELTS Exam'),
+        ('LEVEL', 'Level Test'),
+        ('GENERAL', 'General Use'),
+    ]
+    
+    usage_type = models.CharField(
+        max_length=20,
+        choices=USAGE_TYPE_CHOICES,
+        default='QUESTION_BANK',
+        verbose_name="نوع الاستخدام"
+    )
+    
+    class Meta:
+        verbose_name = "مجموعة أسئلة قواعد"
+        verbose_name_plural = "مجموعات أسئلة القواعد"
+        ordering = ['order', 'created_at']
+    
+    def __str__(self):
+        return self.title
+    
+    def get_questions_count(self):
+        """عدد الأسئلة"""
+        return self.questions.count()
+
+
+class GrammarQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel, UsageTypeMixin):
+    """
+    سؤال قواعد
+    """
+    question_set = models.ForeignKey(
+        GrammarQuestionSet,
+        on_delete=models.CASCADE,
+        related_name='questions',
+        verbose_name="مجموعة الأسئلة"
+    )
+    
+    # ✅ إضافة question_bank
+    question_bank = models.ForeignKey(
+        'placement_test.QuestionBank',
+        on_delete=models.CASCADE,
+        related_name='grammar_questions',
+        null=True,
+        blank=True,
+        verbose_name="بنك الأسئلة"
+    )
+    
+    class Meta:
+        verbose_name = "سؤال قواعد"
+        verbose_name_plural = "أسئلة القواعد"
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['usage_type', 'placement_test']),
+        ]
 
 
 # ============================================
 # Reading Questions (أسئلة القراءة)
 # ============================================
 
-class ReadingPassage(BaseQuestion):
+class ReadingPassage(TimeStampedModel, OrderedModel, UsageTypeMixin):
     """
-    قطعة القراءة (النموذج الأب)
+    قطعة القراءة
     """
-    placement_test = models.ForeignKey(
-        PlacementTest,
-        on_delete=models.CASCADE,
-        related_name='reading_passages',
-        verbose_name="امتحان تحديد المستوى",
-        blank=True,
-        null=True
-    )
+    title = models.CharField(max_length=200, verbose_name="عنوان القطعة")
     passage_text = models.TextField(verbose_name="نص القطعة")
     passage_image = CloudinaryField(
-        'image',
+        verbose_name="صورة القطعة",
         blank=True,
         null=True,
-        folder='reading/images'
     )
     source = models.CharField(
         max_length=200,
@@ -237,15 +322,36 @@ class ReadingPassage(BaseQuestion):
         verbose_name="مصدر القطعة"
     )
     
+    # ✅ إضافة question_bank
+    question_bank = models.ForeignKey(
+        'placement_test.QuestionBank',
+        on_delete=models.CASCADE,
+        related_name='reading_passages',
+        null=True,
+        blank=True,
+        verbose_name="بنك الأسئلة"
+    )
+    
     class Meta:
         verbose_name = "قطعة قراءة"
         verbose_name_plural = "قطع القراءة"
-        ordering = ['placement_test', 'order', 'created_at']
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['usage_type', 'placement_test']),
+        ]
+    
+    def __str__(self):
+        return self.title
+    
+    def get_questions_count(self):
+        """عدد الأسئلة"""
+        return self.questions.count()
 
 
-class ReadingQuestion(BaseMCQQuestion):
+class ReadingQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel):
     """
-    سؤال قراءة (النموذج الابن)
+    سؤال قراءة
+    ملاحظة: لا يحتاج UsageTypeMixin لأنه مرتبط بالـ Passage
     """
     passage = models.ForeignKey(
         ReadingPassage,
@@ -253,34 +359,34 @@ class ReadingQuestion(BaseMCQQuestion):
         related_name='questions',
         verbose_name="القطعة"
     )
-    order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
     
     class Meta:
         verbose_name = "سؤال قراءة"
         verbose_name_plural = "أسئلة القراءة"
         ordering = ['order', 'created_at']
+    
+    def get_usage_type(self):
+        """الحصول على usage_type من الـ Passage"""
+        return self.passage.usage_type
+    
+    def get_placement_test(self):
+        """الحصول على placement_test من الـ Passage"""
+        return self.passage.placement_test
 
 
 # ============================================
 # Listening Questions (أسئلة الاستماع)
 # ============================================
 
-class ListeningAudio(BaseQuestion):
+class ListeningAudio(TimeStampedModel, OrderedModel, UsageTypeMixin):
     """
-    التسجيل الصوتي (النموذج الأب)
+    التسجيل الصوتي
     """
-    placement_test = models.ForeignKey(
-        PlacementTest,
-        on_delete=models.CASCADE,
-        related_name='listening_audios',
-        verbose_name="امتحان تحديد المستوى",
-        blank=True,
-        null=True
-    )
+    title = models.CharField(max_length=200, verbose_name="عنوان التسجيل")
     audio_file = CloudinaryField(
-        'video',
+        verbose_name="ملف الصوت",
         resource_type='video',
-        folder='listening/audio'
+        folder='listening/audio',
     )
     transcript = models.TextField(
         blank=True,
@@ -294,15 +400,35 @@ class ListeningAudio(BaseQuestion):
         verbose_name="مدة التسجيل"
     )
     
+    # ✅ إضافة question_bank
+    question_bank = models.ForeignKey(
+        'placement_test.QuestionBank',
+        on_delete=models.CASCADE,
+        related_name='listening_audios',
+        null=True,
+        blank=True,
+        verbose_name="بنك الأسئلة"
+    )
+    
     class Meta:
         verbose_name = "تسجيل صوتي"
         verbose_name_plural = "التسجيلات الصوتية"
-        ordering = ['placement_test', 'order', 'created_at']
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['usage_type', 'placement_test']),
+        ]
+    
+    def __str__(self):
+        return self.title
+    
+    def get_questions_count(self):
+        """عدد الأسئلة"""
+        return self.questions.count()
 
 
-class ListeningQuestion(BaseMCQQuestion):
+class ListeningQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel):
     """
-    سؤال استماع (النموذج الابن)
+    سؤال استماع
     """
     audio = models.ForeignKey(
         ListeningAudio,
@@ -310,34 +436,34 @@ class ListeningQuestion(BaseMCQQuestion):
         related_name='questions',
         verbose_name="التسجيل الصوتي"
     )
-    order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
     
     class Meta:
         verbose_name = "سؤال استماع"
         verbose_name_plural = "أسئلة الاستماع"
         ordering = ['order', 'created_at']
+    
+    def get_usage_type(self):
+        """الحصول على usage_type من الـ Audio"""
+        return self.audio.usage_type
+    
+    def get_placement_test(self):
+        """الحصول على placement_test من الـ Audio"""
+        return self.audio.placement_test
 
 
 # ============================================
 # Speaking Questions (أسئلة التحدث)
 # ============================================
 
-class SpeakingVideo(BaseQuestion):
+class SpeakingVideo(TimeStampedModel, OrderedModel, UsageTypeMixin):
     """
-    الفيديو التعليمي (النموذج الأب)
+    الفيديو التعليمي
     """
-    placement_test = models.ForeignKey(
-        PlacementTest,
-        on_delete=models.CASCADE,
-        related_name='speaking_videos',
-        verbose_name="امتحان تحديد المستوى",
-        blank=True,
-        null=True
-    )
+    title = models.CharField(max_length=200, verbose_name="عنوان الفيديو")
     video_file = CloudinaryField(
-        'video',
+        verbose_name="ملف الفيديو",
         resource_type='video',
-        folder='speaking/videos'
+        folder='speaking/videos',
     )
     description = models.TextField(
         blank=True,
@@ -351,21 +477,41 @@ class SpeakingVideo(BaseQuestion):
         verbose_name="مدة الفيديو"
     )
     thumbnail = CloudinaryField(
-        'image',
+        verbose_name="صورة مصغرة",
         blank=True,
         null=True,
-        folder='speaking/thumbnails'
+        folder='speaking/thumbnails',
+    )
+    
+    # ✅ إضافة question_bank
+    question_bank = models.ForeignKey(
+        'placement_test.QuestionBank',
+        on_delete=models.CASCADE,
+        related_name='speaking_videos',
+        null=True,
+        blank=True,
+        verbose_name="بنك الأسئلة"
     )
     
     class Meta:
         verbose_name = "فيديو تحدث"
         verbose_name_plural = "فيديوهات التحدث"
-        ordering = ['placement_test', 'order', 'created_at']
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['usage_type', 'placement_test']),
+        ]
+    
+    def __str__(self):
+        return self.title
+    
+    def get_questions_count(self):
+        """عدد الأسئلة"""
+        return self.questions.count()
 
 
-class SpeakingQuestion(BaseMCQQuestion):
+class SpeakingQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel):
     """
-    سؤال تحدث (النموذج الابن)
+    سؤال تحدث
     """
     video = models.ForeignKey(
         SpeakingVideo,
@@ -373,37 +519,36 @@ class SpeakingQuestion(BaseMCQQuestion):
         related_name='questions',
         verbose_name="الفيديو"
     )
-    order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
     
     class Meta:
         verbose_name = "سؤال تحدث"
         verbose_name_plural = "أسئلة التحدث"
         ordering = ['order', 'created_at']
+    
+    def get_usage_type(self):
+        """الحصول على usage_type من الـ Video"""
+        return self.video.usage_type
+    
+    def get_placement_test(self):
+        """الحصول على placement_test من الـ Video"""
+        return self.video.placement_test
 
 
 # ============================================
 # Writing Questions (أسئلة الكتابة)
 # ============================================
 
-class WritingQuestion(models.Model):
+class WritingQuestion(TimeStampedModel, OrderedModel, UsageTypeMixin):
     """
-    سؤال كتابة (نموذج مستقل بدون أب)
+    سؤال كتابة
     """
-    placement_test = models.ForeignKey(
-        PlacementTest,
-        on_delete=models.CASCADE,
-        related_name='writing_questions',
-        verbose_name="امتحان تحديد المستوى",
-        blank=True,
-        null=True
-    )
     title = models.CharField(max_length=500, verbose_name="عنوان السؤال")
     question_text = models.TextField(verbose_name="نص السؤال")
     question_image = CloudinaryField(
-        'image',
+        verbose_name="صورة السؤال",
         blank=True,
         null=True,
-        folder='writing/images'
+        folder='writing/images',
     )
     
     # متطلبات الإجابة
@@ -432,20 +577,37 @@ class WritingQuestion(models.Model):
     )
     
     points = models.PositiveIntegerField(
-        default=10,
+        default=1,  # ← تغيير من 10 إلى 1
         validators=[MinValueValidator(1)],
-        verbose_name="النقاط"
+        verbose_name="النقاط",
+        editable=False  # ← منع التعديل (ثابتة على 1)
     )
     
-    order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
-    is_active = models.BooleanField(default=True, verbose_name="نشط")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="تاريخ التحديث")
+    # ✅ إضافة: نسبة النجاح (Pass Threshold)
+    pass_threshold = models.PositiveIntegerField(
+        default=60,
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        verbose_name="نسبة النجاح المطلوبة (%)",
+        help_text="النسبة المئوية المطلوبة لاعتبار الإجابة صحيحة (default: 60%)"
+    )
+    
+    # ✅ إضافة question_bank
+    question_bank = models.ForeignKey(
+        'placement_test.QuestionBank',
+        on_delete=models.CASCADE,
+        related_name='writing_questions',
+        null=True,
+        blank=True,
+        verbose_name="بنك الأسئلة"
+    )
     
     class Meta:
         verbose_name = "سؤال كتابة"
         verbose_name_plural = "أسئلة الكتابة"
-        ordering = ['placement_test', 'order', 'created_at']
+        ordering = ['order', 'created_at']
+        indexes = [
+            models.Index(fields=['usage_type', 'placement_test']),
+        ]
     
     def __str__(self):
         return self.title

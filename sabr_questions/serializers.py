@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import (
-    PlacementTest, MCQQuestionSet, MCQQuestion,
+from sabr_questions.models import (
+    VocabularyQuestion, VocabularyQuestionSet,
+    GrammarQuestion, GrammarQuestionSet,
     ReadingPassage, ReadingQuestion,
     ListeningAudio, ListeningQuestion,
     SpeakingVideo, SpeakingQuestion,
@@ -9,315 +10,328 @@ from .models import (
 
 
 # ============================================
-# MCQ Serializers
+# 1. VOCABULARY SERIALIZERS
 # ============================================
 
-class MCQQuestionSerializer(serializers.ModelSerializer):
-    """Serializer لأسئلة MCQ الفردية"""
+class VocabularyQuestionSetSerializer(serializers.ModelSerializer):
+    """مجموعة أسئلة المفردات"""
+    questions_count = serializers.SerializerMethodField()
     
     class Meta:
-        model = MCQQuestion
+        model = VocabularyQuestionSet
         fields = [
-            'id', 'question_set', 'question_text', 'question_image',
-            'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points', 'order',
+            'id', 'title', 'description', 'usage_type',
+            'order', 'is_active', 'questions_count',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-class MCQQuestionSetSerializer(serializers.ModelSerializer):
-    """Serializer لمجموعة أسئلة MCQ مع الأسئلة"""
-    questions = MCQQuestionSerializer(many=True, read_only=True)
-    questions_count = serializers.SerializerMethodField()
-    total_points = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = MCQQuestionSet
-        fields = [
-            'id', 'placement_test', 'title', 'description',
-            'order', 'is_active', 'questions', 'questions_count',
-            'total_points', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_questions_count(self, obj):
-        return obj.questions.count()
-    
-    def get_total_points(self, obj):
-        return sum(q.points for q in obj.questions.all())
+        return obj.get_questions_count()
 
 
-class MCQQuestionSetCreateSerializer(serializers.ModelSerializer):
-    """Serializer لإنشاء مجموعة MCQ بدون الأسئلة"""
+class VocabularyQuestionSerializer(serializers.ModelSerializer):
+    """سؤال مفردات - للعرض"""
+    question_set_title = serializers.CharField(source='question_set.title', read_only=True)
     
     class Meta:
-        model = MCQQuestionSet
+        model = VocabularyQuestion
         fields = [
-            'id', 'placement_test', 'title', 'description',
+            'id', 'question_set', 'question_set_title',
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
+            'usage_type', 'order', 'is_active',
+            'created_at', 'updated_at'
+        ]
+
+
+class CreateVocabularyQuestionSerializer(serializers.ModelSerializer):
+    """إنشاء سؤال مفردات"""
+    question_set_id = serializers.IntegerField(required=False, write_only=True)
+    question_set_title = serializers.CharField(required=False, write_only=True)
+    question_set_description = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    
+    class Meta:
+        model = VocabularyQuestion
+        fields = [
+            'question_set_id', 'question_set_title', 'question_set_description',
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
             'order', 'is_active'
         ]
-        read_only_fields = ['id']
 
 
 # ============================================
-# Reading Serializers
+# 2. GRAMMAR SERIALIZERS
+# ============================================
+
+class GrammarQuestionSetSerializer(serializers.ModelSerializer):
+    """مجموعة أسئلة القواعد"""
+    questions_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = GrammarQuestionSet
+        fields = [
+            'id', 'title', 'description', 'usage_type',
+            'order', 'is_active', 'questions_count',
+            'created_at', 'updated_at'
+        ]
+    
+    def get_questions_count(self, obj):
+        return obj.get_questions_count()
+
+
+class GrammarQuestionSerializer(serializers.ModelSerializer):
+    """سؤال قواعد - للعرض"""
+    question_set_title = serializers.CharField(source='question_set.title', read_only=True)
+    
+    class Meta:
+        model = GrammarQuestion
+        fields = [
+            'id', 'question_set', 'question_set_title',
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
+            'usage_type', 'order', 'is_active',
+            'created_at', 'updated_at'
+        ]
+
+
+class CreateGrammarQuestionSerializer(serializers.ModelSerializer):
+    """إنشاء سؤال قواعد"""
+    question_set_id = serializers.IntegerField(required=False, write_only=True)
+    question_set_title = serializers.CharField(required=False, write_only=True)
+    question_set_description = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    
+    class Meta:
+        model = GrammarQuestion
+        fields = [
+            'question_set_id', 'question_set_title', 'question_set_description',
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active'
+        ]
+
+
+# ============================================
+# 3. READING SERIALIZERS
 # ============================================
 
 class ReadingQuestionSerializer(serializers.ModelSerializer):
-    """Serializer لأسئلة القراءة"""
-    
+    """سؤال قراءة - للعرض"""
     class Meta:
         model = ReadingQuestion
         fields = [
-            'id', 'passage', 'question_text', 'question_image',
+            'id', 'passage',
+            'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points', 'order',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class ReadingPassageSerializer(serializers.ModelSerializer):
-    """Serializer لقطعة القراءة مع الأسئلة"""
+    """قطعة قراءة - للعرض"""
     questions = ReadingQuestionSerializer(many=True, read_only=True)
     questions_count = serializers.SerializerMethodField()
-    total_points = serializers.SerializerMethodField()
     
     class Meta:
         model = ReadingPassage
         fields = [
-            'id', 'placement_test', 'title', 'passage_text',
-            'passage_image', 'source', 'order', 'is_active',
-            'questions', 'questions_count', 'total_points',
+            'id', 'title', 'passage_text', 'passage_image', 'source',
+            'usage_type', 'order', 'is_active',
+            'questions', 'questions_count',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_questions_count(self, obj):
-        return obj.questions.count()
-    
-    def get_total_points(self, obj):
-        return sum(q.points for q in obj.questions.all())
+        return obj.get_questions_count()
 
 
-class ReadingPassageCreateSerializer(serializers.ModelSerializer):
-    """Serializer لإنشاء قطعة قراءة بدون الأسئلة"""
-    
+class CreateReadingPassageSerializer(serializers.ModelSerializer):
+    """إنشاء قطعة قراءة"""
     class Meta:
         model = ReadingPassage
         fields = [
-            'id', 'placement_test', 'title', 'passage_text',
-            'passage_image', 'source', 'order', 'is_active'
+            'title', 'passage_text', 'passage_image', 'source',
+            'order', 'is_active'
         ]
-        read_only_fields = ['id']
+
+
+class CreateReadingQuestionSerializer(serializers.ModelSerializer):
+    """إنشاء سؤال قراءة"""
+    class Meta:
+        model = ReadingQuestion
+        fields = [
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active'
+        ]
 
 
 # ============================================
-# Listening Serializers
+# 4. LISTENING SERIALIZERS
 # ============================================
 
 class ListeningQuestionSerializer(serializers.ModelSerializer):
-    """Serializer لأسئلة الاستماع"""
-    
+    """سؤال استماع - للعرض"""
     class Meta:
         model = ListeningQuestion
         fields = [
-            'id', 'audio', 'question_text', 'question_image',
+            'id', 'audio',
+            'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points', 'order',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class ListeningAudioSerializer(serializers.ModelSerializer):
-    """Serializer للتسجيل الصوتي مع الأسئلة"""
+    """تسجيل صوتي - للعرض"""
     questions = ListeningQuestionSerializer(many=True, read_only=True)
     questions_count = serializers.SerializerMethodField()
-    total_points = serializers.SerializerMethodField()
+    audio_file_url = serializers.SerializerMethodField()
     
     class Meta:
         model = ListeningAudio
         fields = [
-            'id', 'placement_test', 'title', 'audio_file',
-            'transcript', 'duration', 'order', 'is_active',
-            'questions', 'questions_count', 'total_points',
+            'id', 'title', 'audio_file', 'audio_file_url',
+            'transcript', 'duration',
+            'usage_type', 'order', 'is_active',
+            'questions', 'questions_count',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_questions_count(self, obj):
-        return obj.questions.count()
+        return obj.get_questions_count()
     
-    def get_total_points(self, obj):
-        return sum(q.points for q in obj.questions.all())
+    def get_audio_file_url(self, obj):
+        if obj.audio_file:
+            return obj.audio_file.url
+        return None
 
 
-class ListeningAudioCreateSerializer(serializers.ModelSerializer):
-    """Serializer لإنشاء تسجيل صوتي بدون الأسئلة"""
-    
+class CreateListeningAudioSerializer(serializers.ModelSerializer):
+    """إنشاء تسجيل صوتي"""
     class Meta:
         model = ListeningAudio
         fields = [
-            'id', 'placement_test', 'title', 'audio_file',
-            'transcript', 'duration', 'order', 'is_active'
+            'title', 'audio_file', 'transcript', 'duration',
+            'order', 'is_active'
         ]
-        read_only_fields = ['id']
+
+
+class CreateListeningQuestionSerializer(serializers.ModelSerializer):
+    """إنشاء سؤال استماع"""
+    class Meta:
+        model = ListeningQuestion
+        fields = [
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active'
+        ]
 
 
 # ============================================
-# Speaking Serializers
+# 5. SPEAKING SERIALIZERS
 # ============================================
 
 class SpeakingQuestionSerializer(serializers.ModelSerializer):
-    """Serializer لأسئلة التحدث"""
-    
+    """سؤال تحدث - للعرض"""
     class Meta:
         model = SpeakingQuestion
         fields = [
-            'id', 'video', 'question_text', 'question_image',
+            'id', 'video',
+            'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points', 'order',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class SpeakingVideoSerializer(serializers.ModelSerializer):
-    """Serializer لفيديو التحدث مع الأسئلة"""
+    """فيديو تحدث - للعرض"""
     questions = SpeakingQuestionSerializer(many=True, read_only=True)
     questions_count = serializers.SerializerMethodField()
-    total_points = serializers.SerializerMethodField()
+    video_file_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
     
     class Meta:
         model = SpeakingVideo
         fields = [
-            'id', 'placement_test', 'title', 'video_file',
-            'description', 'duration', 'thumbnail', 'order',
-            'is_active', 'questions', 'questions_count',
-            'total_points', 'created_at', 'updated_at'
+            'id', 'title', 'video_file', 'video_file_url',
+            'description', 'duration', 'thumbnail', 'thumbnail_url',
+            'usage_type', 'order', 'is_active',
+            'questions', 'questions_count',
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_questions_count(self, obj):
-        return obj.questions.count()
+        return obj.get_questions_count()
     
-    def get_total_points(self, obj):
-        return sum(q.points for q in obj.questions.all())
+    def get_video_file_url(self, obj):
+        if obj.video_file:
+            return obj.video_file.url
+        return None
+    
+    def get_thumbnail_url(self, obj):
+        if obj.thumbnail:
+            return obj.thumbnail.url
+        return None
 
 
-class SpeakingVideoCreateSerializer(serializers.ModelSerializer):
-    """Serializer لإنشاء فيديو تحدث بدون الأسئلة"""
-    
+class CreateSpeakingVideoSerializer(serializers.ModelSerializer):
+    """إنشاء فيديو تحدث"""
     class Meta:
         model = SpeakingVideo
         fields = [
-            'id', 'placement_test', 'title', 'video_file',
-            'description', 'duration', 'thumbnail', 'order',
-            'is_active'
+            'title', 'video_file', 'description', 'duration', 'thumbnail',
+            'order', 'is_active'
         ]
-        read_only_fields = ['id']
+
+
+class CreateSpeakingQuestionSerializer(serializers.ModelSerializer):
+    """إنشاء سؤال تحدث"""
+    class Meta:
+        model = SpeakingQuestion
+        fields = [
+            'question_text', 'question_image',
+            'choice_a', 'choice_b', 'choice_c', 'choice_d',
+            'correct_answer', 'explanation', 'points',
+            'order', 'is_active'
+        ]
 
 
 # ============================================
-# Writing Serializers
+# 6. WRITING SERIALIZERS
 # ============================================
 
 class WritingQuestionSerializer(serializers.ModelSerializer):
-    """Serializer لأسئلة الكتابة"""
-    
+    """سؤال كتابة - للعرض"""
     class Meta:
         model = WritingQuestion
         fields = [
-            'id', 'placement_test', 'title', 'question_text',
-            'question_image', 'min_words', 'max_words',
-            'sample_answer', 'rubric', 'points', 'order',
-            'is_active', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-# ============================================
-# Placement Test Serializers
-# ============================================
-
-class PlacementTestListSerializer(serializers.ModelSerializer):
-    """Serializer لقائمة الامتحانات (مختصر)"""
-    total_points = serializers.SerializerMethodField()
-    questions_count = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = PlacementTest
-        fields = [
-            'id', 'title', 'description', 'duration_minutes',
-            'a1_min_score', 'a2_min_score', 'b1_min_score', 'b2_min_score',  # أضف دول
-            'is_active', 'total_points', 'questions_count',
+            'id', 'title', 'question_text', 'question_image',
+            'min_words', 'max_words', 'sample_answer', 'rubric',
+            'points', 'pass_threshold',
+            'usage_type', 'order', 'is_active',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-    
-    def get_total_points(self, obj):
-        return obj.get_total_points()
-    
-    def get_questions_count(self, obj):
-        return obj.get_questions_count()
 
-class PlacementTestDetailSerializer(serializers.ModelSerializer):
-    """Serializer لتفاصيل الامتحان الكاملة"""
-    mcq_sets = MCQQuestionSetSerializer(many=True, read_only=True)
-    reading_passages = ReadingPassageSerializer(many=True, read_only=True)
-    listening_audios = ListeningAudioSerializer(many=True, read_only=True)
-    speaking_videos = SpeakingVideoSerializer(many=True, read_only=True)
-    writing_questions = WritingQuestionSerializer(many=True, read_only=True)
-    
-    total_points = serializers.SerializerMethodField()
-    questions_count = serializers.SerializerMethodField()
-    
+
+class CreateWritingQuestionSerializer(serializers.ModelSerializer):
+    """إنشاء سؤال كتابة"""
     class Meta:
-        model = PlacementTest
+        model = WritingQuestion
         fields = [
-            'id', 'title', 'description', 'duration_minutes',
-            'a1_min_score', 'a2_min_score', 'b1_min_score', 'b2_min_score',
-            'is_active', 'mcq_sets', 'reading_passages',
-            'listening_audios', 'speaking_videos', 'writing_questions',
-            'total_points', 'questions_count', 'created_at', 'updated_at'
+            'title', 'question_text', 'question_image',
+            'min_words', 'max_words', 'sample_answer', 'rubric',
+            'pass_threshold', 'order', 'is_active'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-    
-    def get_total_points(self, obj):
-        return obj.get_total_points()
-    
-    def get_questions_count(self, obj):
-        return obj.get_questions_count()
-
-
-class PlacementTestCreateSerializer(serializers.ModelSerializer):
-    """Serializer لإنشاء امتحان جديد"""
-    
-    class Meta:
-        model = PlacementTest
-        fields = [
-            'id', 'title', 'description', 'duration_minutes',
-            'a1_min_score', 'a2_min_score', 'b1_min_score', 'b2_min_score',
-            'is_active'
-        ]
-        read_only_fields = ['id']
-    
-    def validate(self, data):
-        """التحقق من صحة درجات المستويات"""
-        scores = [
-            data.get('a1_min_score', 0),
-            data.get('a2_min_score'),
-            data.get('b1_min_score'),
-            data.get('b2_min_score')
-        ]
-        
-        # التأكد أن الدرجات متصاعدة
-        for i in range(len(scores) - 1):
-            if scores[i] >= scores[i + 1]:
-                raise serializers.ValidationError(
-                    "يجب أن تكون درجات المستويات متصاعدة (A1 < A2 < B1 < B2)"
-                )
-        
-        return data
