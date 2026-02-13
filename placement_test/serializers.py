@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from placement_test.models import QuestionBank , StudentPlacementTestAnswer, StudentPlacementTestAttempt
+from placement_test.models import PlacementQuestionBank , StudentPlacementTestAnswer, StudentPlacementTestAttempt
 from sabr_questions.models import (
     VocabularyQuestionSet,
     VocabularyQuestion,
@@ -19,7 +19,7 @@ from sabr_questions.models import (
 # Question Bank Serializers
 # ============================================
 
-class QuestionBankSerializer(serializers.ModelSerializer):
+class PlacementQuestionBankSerializer(serializers.ModelSerializer):
     """
     Serializer بسيط لعرض قائمة البنوك
     """
@@ -27,7 +27,7 @@ class QuestionBankSerializer(serializers.ModelSerializer):
     is_ready = serializers.BooleanField(source='is_ready_for_exam', read_only=True)
     
     class Meta:
-        model = QuestionBank
+        model = PlacementQuestionBank 
         fields = [
             'id',
             'title',
@@ -40,12 +40,12 @@ class QuestionBankSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class QuestionBankCreateSerializer(serializers.ModelSerializer):
+class PlacementQuestionBankCreateSerializer(serializers.ModelSerializer):
     """
     Serializer لإنشاء بنك أسئلة جديد
     """
     class Meta:
-        model = QuestionBank
+        model = PlacementQuestionBank 
         fields = [
             'title',
             'description'
@@ -55,14 +55,14 @@ class QuestionBankCreateSerializer(serializers.ModelSerializer):
         """
         التحقق من عدم تكرار العنوان
         """
-        if QuestionBank.objects.filter(title=value).exists():
+        if PlacementQuestionBank .objects.filter(title=value).exists():
             raise serializers.ValidationError(
                 "يوجد بنك أسئلة بهذا العنوان بالفعل"
             )
         return value
 
 
-class QuestionBankDetailSerializer(serializers.ModelSerializer):
+class PlacementQuestionBankDetailSerializer(serializers.ModelSerializer):
     """
     Serializer مفصل لعرض تفاصيل البنك
     """
@@ -76,7 +76,7 @@ class QuestionBankDetailSerializer(serializers.ModelSerializer):
     is_ready = serializers.BooleanField(source='is_ready_for_exam', read_only=True)
     
     class Meta:
-        model = QuestionBank
+        model = PlacementQuestionBank 
         fields = [
             'id',
             'title',
@@ -95,12 +95,12 @@ class QuestionBankDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class QuestionBankUpdateSerializer(serializers.ModelSerializer):
+class PlacementQuestionBankUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer لتعديل بنك موجود
     """
     class Meta:
-        model = QuestionBank
+        model = PlacementQuestionBank 
         fields = [
             'title',
             'description'
@@ -111,7 +111,7 @@ class QuestionBankUpdateSerializer(serializers.ModelSerializer):
         التحقق من عدم تكرار العنوان (مع استثناء البنك الحالي)
         """
         instance = self.instance
-        if QuestionBank.objects.filter(title=value).exclude(id=instance.id).exists():
+        if PlacementQuestionBank.objects.filter(title=value).exclude(id=instance.id).exists():
             raise serializers.ValidationError(
                 "يوجد بنك أسئلة آخر بهذا العنوان"
             )

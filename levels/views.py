@@ -8,7 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 import random
 import json
 from cloudinary.models import CloudinaryResource
-
+from placement_test.services.exam_service import exam_service
+from placement_test.services.ai_grading import ai_grading_service
 from levels.models import (
     Level, Unit, Lesson,
     ReadingLessonContent, ListeningLessonContent,
@@ -16,7 +17,7 @@ from levels.models import (
     UnitExam, LevelExam,
     StudentLevel, StudentUnit, StudentLesson,
     StudentUnitExamAttempt, StudentLevelExamAttempt,
-    QuestionBank
+    LevelsUnitsQuestionBank
 )
 
 from levels.serializers import (
@@ -37,7 +38,7 @@ from levels.serializers import (
     # Progress Serializers
     StudentLevelSerializer, StudentUnitSerializer, StudentLessonSerializer,
     # Question Bank Serializers
-    QuestionBankListSerializer, QuestionBankDetailSerializer, QuestionBankCreateUpdateSerializer,
+    LevelsUnitsQuestionBankListSerializer, LevelsUnitsQuestionBankDetailSerializer, LevelsUnitsQuestionBankCreateUpdateSerializer,
     # Exam Attempt Serializers
     StudentUnitExamAttemptSerializer, StudentLevelExamAttemptSerializer
 )
@@ -84,8 +85,8 @@ def create_level(request):
     with transaction.atomic():
         level = serializer.save()
         
-        # ✅ إنشاء QuestionBank تلقائياً للمستوى
-        QuestionBank.objects.create(
+        # ✅ إنشاء LevelsUnitsQuestionBank تلقائياً للمستوى
+        LevelsUnitsQuestionBank.objects.create(
             level=level,
             title=f"Question Bank - {level.code}",
             description=f"Automatically created for Level {level.code}"
@@ -186,7 +187,7 @@ def delete_level(request, level_id):
 @permission_classes([IsAuthenticated])
 def create_unit(request):
     """
-    إنشاء وحدة جديدة (مع إنشاء QuestionBank تلقائياً)
+    إنشاء وحدة جديدة (مع إنشاء LevelsUnitsQuestionBank تلقائياً)
     
     POST /api/units/create/
     
@@ -204,7 +205,7 @@ def create_unit(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    # الـ create method في الـ Serializer بيعمل QuestionBank تلقائياً
+    # الـ create method في الـ Serializer بيعمل LevelsUnitsQuestionBank تلقائياً
     unit = serializer.save()
     result_serializer = UnitDetailSerializer(unit)
     
@@ -512,7 +513,7 @@ def create_reading_lesson_content_with_passage(request):
         reading_passage = ReadingPassage.objects.create(
             usage_type='LESSON',
             lesson=lesson,
-            question_bank=None,
+            levels_units_question_bank=None,
             **passage_data
         )
         
@@ -751,7 +752,7 @@ def create_listening_lesson_content_with_audio(request):
             listening_audio = ListeningAudio(
                 usage_type='LESSON',
                 lesson=lesson,
-                question_bank=None,
+                levels_units_question_bank=None,
                 title=title,
                 transcript=transcript,
                 duration=int(duration) if duration else 0,
@@ -1024,7 +1025,7 @@ def create_speaking_lesson_content_with_video(request):
             speaking_video = SpeakingVideo(
                 usage_type='LESSON',
                 lesson=lesson,
-                question_bank=None,
+                levels_units_question_bank=None,
                 title=title,
                 description=description,
                 duration=int(duration) if duration else 0,
@@ -1362,237 +1363,7 @@ def delete_writing_lesson_content(request, lesson_id):
 
 # ---------- 5.1 Unit Exam ----------
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_unit_exam(request):
-    """
-    إنشاء امتحان وحدة
-    
-    POST /api/exams/unit/create/
-    
-    Body:
-    {
-        "unit": 1,
-        "title": "Unit 1 Final Exam",
-        "description": "...",
-        "instructions": "...",
-        "time_limit": 35,
-        "vocabulary_count": 8,
-        "grammar_count": 8,
-        "reading_questions_count": 10,
-        "listening_questions_count": 3,
-        "speaking_questions_count": 3,
-        "writing_questions_count": 3
-    }
-    """
-    serializer = UnitExamCreateUpdateSerializer(data=request.data)
-    
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    unit_exam = serializer.save()
-    result_serializer = UnitExamSerializer(unit_exam)
-    
-    return Response({
-        'message': 'تم إنشاء امتحان الوحدة بنجاح',
-        'exam': result_serializer.data
-    }, status=status.HTTP_201_CREATED)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_unit_exams(request):
-    """
-    عرض جميع امتحانات الوحدات
-    
-    GET /api/exams/unit/
-    
-    Query Parameters:
-    - unit_id: filter by unit
-    """
-    unit_id = request.query_params.get('unit_id', None)
-    
-    exams = UnitExam.objects.filter(is_active=True).select_related('unit', 'unit__level')
-    
-    if unit_id:
-        exams = exams.filter(unit_id=unit_id)
-    
-    exams = exams.order_by('unit__level__order', 'unit__order')
-    
-    serializer = UnitExamSerializer(exams, many=True)
-    
-    return Response({
-        'total_exams': exams.count(),
-        'exams': serializer.data
-    }, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_unit_exam(request, exam_id):
-    """
-    عرض تفاصيل امتحان وحدة
-    
-    GET /api/exams/unit/{exam_id}/
-    """
-    exam = get_object_or_404(UnitExam, id=exam_id)
-    serializer = UnitExamSerializer(exam)
-    
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def update_unit_exam(request, exam_id):
-    """
-    تعديل امتحان وحدة
-    
-    PUT /api/exams/unit/{exam_id}/update/
-    """
-    exam = get_object_or_404(UnitExam, id=exam_id)
-    
-    partial = request.method == 'PATCH'
-    serializer = UnitExamCreateUpdateSerializer(exam, data=request.data, partial=partial)
-    
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    exam = serializer.save()
-    result_serializer = UnitExamSerializer(exam)
-    
-    return Response({
-        'message': 'تم تحديث امتحان الوحدة بنجاح',
-        'exam': result_serializer.data
-    }, status=status.HTTP_200_OK)
-
-
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_unit_exam(request, exam_id):
-    """
-    حذف امتحان وحدة
-    
-    DELETE /api/exams/unit/{exam_id}/delete/
-    """
-    exam = get_object_or_404(UnitExam, id=exam_id)
-    
-    title = exam.title
-    exam.delete()
-    
-    return Response({
-        'message': 'تم حذف امتحان الوحدة بنجاح',
-        'exam_id': exam_id,
-        'title': title
-    }, status=status.HTTP_200_OK)
-
-
 # ---------- 5.2 Level Exam ----------
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_level_exam(request):
-    """
-    إنشاء امتحان مستوى
-    
-    POST /api/exams/level/create/
-    """
-    serializer = LevelExamCreateUpdateSerializer(data=request.data)
-    
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    level_exam = serializer.save()
-    result_serializer = LevelExamSerializer(level_exam)
-    
-    return Response({
-        'message': 'تم إنشاء امتحان المستوى بنجاح',
-        'exam': result_serializer.data
-    }, status=status.HTTP_201_CREATED)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_level_exams(request):
-    """
-    عرض جميع امتحانات المستويات
-    
-    GET /api/exams/level/
-    """
-    level_id = request.query_params.get('level_id', None)
-    
-    exams = LevelExam.objects.filter(is_active=True).select_related('level')
-    
-    if level_id:
-        exams = exams.filter(level_id=level_id)
-    
-    exams = exams.order_by('level__order')
-    
-    serializer = LevelExamSerializer(exams, many=True)
-    
-    return Response({
-        'total_exams': exams.count(),
-        'exams': serializer.data
-    }, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_level_exam(request, exam_id):
-    """
-    عرض تفاصيل امتحان مستوى
-    
-    GET /api/exams/level/{exam_id}/
-    """
-    exam = get_object_or_404(LevelExam, id=exam_id)
-    serializer = LevelExamSerializer(exam)
-    
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def update_level_exam(request, exam_id):
-    """
-    تعديل امتحان مستوى
-    
-    PUT /api/exams/level/{exam_id}/update/
-    """
-    exam = get_object_or_404(LevelExam, id=exam_id)
-    
-    partial = request.method == 'PATCH'
-    serializer = LevelExamCreateUpdateSerializer(exam, data=request.data, partial=partial)
-    
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    exam = serializer.save()
-    result_serializer = LevelExamSerializer(exam)
-    
-    return Response({
-        'message': 'تم تحديث امتحان المستوى بنجاح',
-        'exam': result_serializer.data
-    }, status=status.HTTP_200_OK)
-
-
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_level_exam(request, exam_id):
-    """
-    حذف امتحان مستوى
-    
-    DELETE /api/exams/level/{exam_id}/delete/
-    """
-    exam = get_object_or_404(LevelExam, id=exam_id)
-    
-    title = exam.title
-    exam.delete()
-    
-    return Response({
-        'message': 'تم حذف امتحان المستوى بنجاح',
-        'exam_id': exam_id,
-        'title': title
-    }, status=status.HTTP_200_OK)
-
 
 # ============================================
 # 6. QUESTION BANK MANAGEMENT
@@ -1613,7 +1384,7 @@ def list_question_banks(request):
     unit_id = request.query_params.get('unit_id', None)
     level_id = request.query_params.get('level_id', None)
     
-    banks = QuestionBank.objects.all().select_related('unit', 'level')
+    banks = LevelsUnitsQuestionBank.objects.all().select_related('unit', 'level')
     
     if unit_id:
         banks = banks.filter(unit_id=unit_id)
@@ -1623,7 +1394,7 @@ def list_question_banks(request):
     
     banks = banks.order_by('-created_at')
     
-    serializer = QuestionBankListSerializer(banks, many=True)
+    serializer = LevelsUnitsQuestionBankListSerializer(banks, many=True)
     
     return Response({
         'total_banks': banks.count(),
@@ -1639,8 +1410,8 @@ def get_question_bank(request, bank_id):
     
     GET /api/question-banks/{bank_id}/
     """
-    bank = get_object_or_404(QuestionBank, id=bank_id)
-    serializer = QuestionBankDetailSerializer(bank)
+    bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
+    serializer = LevelsUnitsQuestionBankDetailSerializer(bank)
     
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1653,7 +1424,7 @@ def question_bank_statistics(request, bank_id):
     
     GET /api/question-banks/{bank_id}/statistics/
     """
-    bank = get_object_or_404(QuestionBank, id=bank_id)
+    bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     
     # عدد الأسئلة الحالية
     stats = {
@@ -1746,34 +1517,10 @@ from placement_test.serializers import (
 # ============================================
 
 # ---------- 7.1 Vocabulary Questions ----------
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_vocabulary_question_to_bank(request, bank_id):
-    """
-    إضافة سؤال مفردات لبنك الأسئلة
-    
-    POST /api/levels/question-banks/{bank_id}/add-vocabulary/
-    
-    Body:
-    {
-        "question_set_id": 1,  // أو
-        "question_set_title": "Vocabulary Set 1",
-        "question_set_description": "...",
-        "question_text": "What is the meaning of 'dog'?",
-        "question_image": null,
-        "choice_a": "Cat",
-        "choice_b": "Dog",
-        "choice_c": "Bird",
-        "choice_d": "Fish",
-        "correct_answer": "B",
-        "explanation": "Dog means كلب",
-        "points": 1,
-        "order": 1,
-        "is_active": true
-    }
-    """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     serializer = CreateVocabularyQuestionSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -1787,13 +1534,13 @@ def add_vocabulary_question_to_bank(request, bank_id):
         if question_set_id:
             question_set = get_object_or_404(VocabularyQuestionSet, id=question_set_id)
         elif question_set_title:
-            # تحديد usage_type بناءً على نوع البنك
+            # ✅ تحديد usage_type بناءً على نوع البنك
             if question_bank.unit:
                 usage_type = 'UNIT_EXAM'
             elif question_bank.level:
                 usage_type = 'LEVEL_EXAM'
             else:
-                usage_type = 'QUESTION_BANK'
+                usage_type = 'QUESTION_BANK'  # Placement Test
             
             question_set, created = VocabularyQuestionSet.objects.get_or_create(
                 title=question_set_title,
@@ -1806,26 +1553,22 @@ def add_vocabulary_question_to_bank(request, bank_id):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # تحديد usage_type للسؤال
+        # ✅ تحديد usage_type للسؤال
         if question_bank.unit:
             usage_type = 'UNIT_EXAM'
-            unit_exam = question_bank.unit
-            level_exam = None
         elif question_bank.level:
             usage_type = 'LEVEL_EXAM'
-            unit_exam = None
-            level_exam = question_bank.level
         else:
-            usage_type = 'QUESTION_BANK'
-            unit_exam = None
-            level_exam = None
+            usage_type = 'QUESTION_BANK'  # Placement Test
         
+        # ✅ إنشاء السؤال
         vocabulary_question = VocabularyQuestion.objects.create(
             question_set=question_set,
             usage_type=usage_type,
-            question_bank=question_bank,
-            unit_exam=unit_exam,
-            level_exam=level_exam,
+            levels_units_question_bank=question_bank,
+            # ❌ لا unit_exam (ده instance من UnitExam model)
+            # ❌ لا level_exam (ده instance من LevelExam model)
+            # ❌ لا lesson
             **serializer.validated_data
         )
     
@@ -1840,8 +1583,6 @@ def add_vocabulary_question_to_bank(request, bank_id):
             'total_vocabulary_questions': question_bank.get_vocabulary_count()
         }
     }, status=status.HTTP_201_CREATED)
-
-
 # ---------- 7.2 Grammar Questions ----------
 
 @api_view(['POST'])
@@ -1852,7 +1593,7 @@ def add_grammar_question_to_bank(request, bank_id):
     
     POST /api/levels/question-banks/{bank_id}/add-grammar/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     serializer = CreateGrammarQuestionSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -1866,6 +1607,7 @@ def add_grammar_question_to_bank(request, bank_id):
         if question_set_id:
             question_set = get_object_or_404(GrammarQuestionSet, id=question_set_id)
         elif question_set_title:
+            # ✅ تحديد usage_type بناءً على نوع البنك
             if question_bank.unit:
                 usage_type = 'UNIT_EXAM'
             elif question_bank.level:
@@ -1884,25 +1626,20 @@ def add_grammar_question_to_bank(request, bank_id):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # ✅ تحديد usage_type للسؤال فقط
         if question_bank.unit:
             usage_type = 'UNIT_EXAM'
-            unit_exam = question_bank.unit
-            level_exam = None
         elif question_bank.level:
             usage_type = 'LEVEL_EXAM'
-            unit_exam = None
-            level_exam = question_bank.level
         else:
             usage_type = 'QUESTION_BANK'
-            unit_exam = None
-            level_exam = None
         
+        # ✅ إنشاء السؤال بدون unit_exam أو level_exam
         grammar_question = GrammarQuestion.objects.create(
             question_set=question_set,
             usage_type=usage_type,
-            question_bank=question_bank,
-            unit_exam=unit_exam,
-            level_exam=level_exam,
+            levels_units_question_bank=question_bank,
+            # ❌ حذف unit_exam و level_exam
             **serializer.validated_data
         )
     
@@ -1917,7 +1654,6 @@ def add_grammar_question_to_bank(request, bank_id):
             'total_grammar_questions': question_bank.get_grammar_count()
         }
     }, status=status.HTTP_201_CREATED)
-
 
 # ---------- 7.3 Reading Questions ----------
 
@@ -1939,7 +1675,7 @@ def create_reading_passage_in_bank(request, bank_id):
         "is_active": true
     }
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     serializer = ReadingPassageSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -1947,22 +1683,15 @@ def create_reading_passage_in_bank(request, bank_id):
     
     if question_bank.unit:
         usage_type = 'UNIT_EXAM'
-        unit_exam = question_bank.unit
-        level_exam = None
     elif question_bank.level:
         usage_type = 'LEVEL_EXAM'
-        unit_exam = None
-        level_exam = question_bank.level
     else:
         usage_type = 'QUESTION_BANK'
-        unit_exam = None
-        level_exam = None
+
     
     reading_passage = ReadingPassage.objects.create(
         usage_type=usage_type,
-        question_bank=question_bank,
-        unit_exam=unit_exam,
-        level_exam=level_exam,
+        levels_units_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -1997,11 +1726,11 @@ def add_reading_question_to_passage(request, bank_id, passage_id):
         "is_active": true
     }
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     reading_passage = get_object_or_404(
         ReadingPassage,
         id=passage_id,
-        question_bank=question_bank
+        levels_units_question_bank=question_bank
     )
     
     serializer = CreateReadingQuestionSerializer(data=request.data)
@@ -2037,7 +1766,7 @@ def create_listening_audio_in_bank(request, bank_id):
     
     POST /api/levels/question-banks/{bank_id}/create-listening-audio/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     serializer = ListeningAudioSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -2045,22 +1774,17 @@ def create_listening_audio_in_bank(request, bank_id):
     
     if question_bank.unit:
         usage_type = 'UNIT_EXAM'
-        unit_exam = question_bank.unit
-        level_exam = None
+        
     elif question_bank.level:
         usage_type = 'LEVEL_EXAM'
-        unit_exam = None
-        level_exam = question_bank.level
+        
     else:
         usage_type = 'QUESTION_BANK'
-        unit_exam = None
-        level_exam = None
+        
     
     listening_audio = ListeningAudio.objects.create(
         usage_type=usage_type,
-        question_bank=question_bank,
-        unit_exam=unit_exam,
-        level_exam=level_exam,
+        levels_units_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -2080,11 +1804,11 @@ def add_listening_question_to_audio(request, bank_id, audio_id):
     
     POST /api/levels/question-banks/{bank_id}/listening-audios/{audio_id}/add-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     listening_audio = get_object_or_404(
         ListeningAudio,
         id=audio_id,
-        question_bank=question_bank
+        levels_units_question_bank=question_bank
     )
     
     serializer = CreateListeningQuestionSerializer(data=request.data)
@@ -2120,7 +1844,7 @@ def create_speaking_video_in_bank(request, bank_id):
     
     POST /api/levels/question-banks/{bank_id}/create-speaking-video/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     serializer = SpeakingVideoSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -2128,22 +1852,17 @@ def create_speaking_video_in_bank(request, bank_id):
     
     if question_bank.unit:
         usage_type = 'UNIT_EXAM'
-        unit_exam = question_bank.unit
-        level_exam = None
+        
     elif question_bank.level:
         usage_type = 'LEVEL_EXAM'
-        unit_exam = None
-        level_exam = question_bank.level
+        
     else:
         usage_type = 'QUESTION_BANK'
-        unit_exam = None
-        level_exam = None
+        
     
     speaking_video = SpeakingVideo.objects.create(
         usage_type=usage_type,
-        question_bank=question_bank,
-        unit_exam=unit_exam,
-        level_exam=level_exam,
+        levels_units_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -2163,11 +1882,11 @@ def add_speaking_question_to_video(request, bank_id, video_id):
     
     POST /api/levels/question-banks/{bank_id}/speaking-videos/{video_id}/add-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     speaking_video = get_object_or_404(
         SpeakingVideo,
         id=video_id,
-        question_bank=question_bank
+        levels_units_question_bank=question_bank
     )
     
     serializer = CreateSpeakingQuestionSerializer(data=request.data)
@@ -2217,7 +1936,7 @@ def add_writing_question_to_bank(request, bank_id):
         "is_active": true
     }
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(LevelsUnitsQuestionBank, id=bank_id)
     serializer = CreateWritingQuestionSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -2225,22 +1944,17 @@ def add_writing_question_to_bank(request, bank_id):
     
     if question_bank.unit:
         usage_type = 'UNIT_EXAM'
-        unit_exam = question_bank.unit
-        level_exam = None
+
     elif question_bank.level:
         usage_type = 'LEVEL_EXAM'
-        unit_exam = None
-        level_exam = question_bank.level
+
     else:
         usage_type = 'QUESTION_BANK'
-        unit_exam = None
-        level_exam = None
+
     
     writing_question = WritingQuestion.objects.create(
         usage_type=usage_type,
-        question_bank=question_bank,
-        unit_exam=unit_exam,
-        level_exam=level_exam,
+        levels_units_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -2651,7 +2365,7 @@ def select_random_questions_for_unit_exam(question_bank, unit_exam):
     # Vocabulary
     vocab_ids = list(
         VocabularyQuestion.objects.filter(
-            question_bank=question_bank,
+            levels_units_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -2663,7 +2377,7 @@ def select_random_questions_for_unit_exam(question_bank, unit_exam):
     # Grammar
     grammar_ids = list(
         GrammarQuestion.objects.filter(
-            question_bank=question_bank,
+            levels_units_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -2675,7 +2389,7 @@ def select_random_questions_for_unit_exam(question_bank, unit_exam):
     # Reading - نختار questions عشوائية
     reading_ids = list(
         ReadingQuestion.objects.filter(
-            passage__question_bank=question_bank,
+            passage__levels_units_question_bank=question_bank,
             passage__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -2688,7 +2402,7 @@ def select_random_questions_for_unit_exam(question_bank, unit_exam):
     # Listening
     listening_ids = list(
         ListeningQuestion.objects.filter(
-            audio__question_bank=question_bank,
+            audio__levels_units_question_bank=question_bank,
             audio__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -2701,7 +2415,7 @@ def select_random_questions_for_unit_exam(question_bank, unit_exam):
     # Speaking
     speaking_ids = list(
         SpeakingQuestion.objects.filter(
-            video__question_bank=question_bank,
+            video__levels_units_question_bank=question_bank,
             video__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -2714,7 +2428,7 @@ def select_random_questions_for_unit_exam(question_bank, unit_exam):
     # Writing
     writing_ids = list(
         WritingQuestion.objects.filter(
-            question_bank=question_bank,
+            levels_units_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -2744,7 +2458,7 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     # Vocabulary
     vocab_ids = list(
         VocabularyQuestion.objects.filter(
-            question_bank=question_bank,
+            levels_units_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -2756,7 +2470,7 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     # Grammar
     grammar_ids = list(
         GrammarQuestion.objects.filter(
-            question_bank=question_bank,
+            levels_units_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -2768,7 +2482,7 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     # Reading
     reading_ids = list(
         ReadingQuestion.objects.filter(
-            passage__question_bank=question_bank,
+            passage__levels_units_question_bank=question_bank,
             passage__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -2781,7 +2495,7 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     # Listening
     listening_ids = list(
         ListeningQuestion.objects.filter(
-            audio__question_bank=question_bank,
+            audio__levels_units_question_bank=question_bank,
             audio__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -2794,7 +2508,7 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     # Speaking
     speaking_ids = list(
         SpeakingQuestion.objects.filter(
-            video__question_bank=question_bank,
+            video__levels_units_question_bank=question_bank,
             video__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -2807,7 +2521,7 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     # Writing
     writing_ids = list(
         WritingQuestion.objects.filter(
-            question_bank=question_bank,
+            levels_units_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -2877,26 +2591,22 @@ def fetch_selected_questions_data(selected_questions):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def start_unit_exam(request, exam_id):
+def start_unit_exam(request, unit_id):
     """
     بدء امتحان وحدة
     
-    POST /api/levels/student/exams/unit/{exam_id}/start/
-    
-    ✅ Checks:
-    - Student completed all lessons in the unit
-    - Question bank is ready
-    - No active attempt
-    
-    ✅ Creates:
-    - StudentUnitExamAttempt with random questions
+    POST /api/levels/student/exams/unit/start/{unit_id}/ 
     """
-    unit_exam = get_object_or_404(UnitExam, id=exam_id, is_active=True)
+    # ✅ جلب الـ Unit
+    unit = get_object_or_404(Unit, id=unit_id, is_active=True)
+    
+    # ✅ جلب الامتحان التلقائي
+    unit_exam = get_object_or_404(UnitExam, unit=unit)
     
     # التحقق من أن الطالب في الوحدة
     student_unit = StudentUnit.objects.filter(
         student=request.user,
-        unit=unit_exam.unit,
+        unit=unit,  # ← استخدم unit مباشرة
         status='IN_PROGRESS'
     ).first()
     
@@ -2914,8 +2624,8 @@ def start_unit_exam(request, exam_id):
             'total_lessons': total_lessons
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # الحصول على QuestionBank
-    question_bank = unit_exam.unit.question_bank.first()
+    # الحصول على LevelsUnitsQuestionBank
+    question_bank = unit_exam.unit.question_banks.first()
     
     if not question_bank:
         return Response({
@@ -3102,24 +2812,48 @@ def submit_unit_exam(request, attempt_id):
         # تصحيح Writing Questions (AI Grading)
         writing_ids = generated_questions.get('writing', [])
         writing_questions = WritingQuestion.objects.filter(id__in=writing_ids)
-        
+
         for wq in writing_questions:
             max_score += wq.points
             answer_key = f"writing_{wq.id}"
             student_answer = answers.get(answer_key, '')
             
             if student_answer:
-                # هنا نستخدم AI Grading (نفس الـ Service من placement_test)
-                # TODO: Integrate with placement_test AI grading service
-                # For now, we'll use a simple threshold
-                
-                # Mock AI Grading (Replace with actual AI service)
-                word_count = len(student_answer.split())
-                
-                if word_count >= wq.min_words and word_count <= wq.max_words:
-                    # Pass threshold (e.g., 60% of points)
-                    ai_score = wq.points * (wq.pass_threshold / 100)
-                    total_score += ai_score
+                try:
+                    # ✅ استخدام AI Grading Service
+                    logger.info(f"Grading writing question {wq.id} for Unit Exam")
+                    
+                    ai_result = ai_grading_service.grade_writing_question(
+                        question_text=wq.question_text,
+                        student_answer=student_answer,
+                        sample_answer=wq.sample_answer or '',
+                        rubric=wq.rubric or '',
+                        max_points=wq.points,
+                        min_words=wq.min_words,
+                        max_words=wq.max_words,
+                        pass_threshold=wq.pass_threshold
+                    )
+                    
+                    # ✅ إضافة النقطة (Binary: 0 or 1)
+                    total_score += ai_result['score']
+                    
+                    logger.info(
+                        f"Writing Q{wq.id}: Raw={ai_result['raw_score']}/{wq.points}, "
+                        f"Percentage={ai_result['percentage']:.1f}%, "
+                        f"Binary Score={ai_result['score']}/1, "
+                        f"Cost=${ai_result['cost']:.6f}"
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"AI Grading Error for Writing Q{wq.id}: {str(e)}")
+                    
+                    # ⚠️ Fallback: استخدام word count check بسيط
+                    word_count = len(student_answer.split())
+                    if wq.min_words <= word_count <= wq.max_words:
+                        total_score += 1
+                        logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=1")
+                    else:
+                        logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=0")
         
         # حساب النسبة المئوية
         percentage = (total_score / max_score * 100) if max_score > 0 else 0
@@ -3177,27 +2911,21 @@ def submit_unit_exam(request, attempt_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def start_level_exam(request, exam_id):
+def start_level_exam(request, level_id):
     """
     بدء امتحان مستوى
     
-    POST /api/levels/student/exams/level/{exam_id}/start/
-    
-    ✅ Checks:
-    - Student completed all units in the level
-    - All unit exams passed
-    - Question bank is ready
-    - No active attempt
-    
-    ✅ Creates:
-    - StudentLevelExamAttempt with random questions
+    POST /api/levels/student/exams/level/start/{level_id}/  ← تغيير
     """
-    level_exam = get_object_or_404(LevelExam, id=exam_id, is_active=True)
+    level = get_object_or_404(Level, id=level_id, is_active=True)
+    
+    # ✅ جلب الامتحان التلقائي
+    level_exam = get_object_or_404(LevelExam, level=level)
     
     # التحقق من أن الطالب في المستوى
     student_level = StudentLevel.objects.filter(
         student=request.user,
-        level=level_exam.level,
+        level=level,  # ← استخدم level مباشرة
         status='IN_PROGRESS'
     ).first()
     
@@ -3222,8 +2950,8 @@ def start_level_exam(request, exam_id):
             'total_units': total_units
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # الحصول على QuestionBank
-    question_bank = level_exam.level.question_bank.first()
+    # الحصول على LevelsUnitsQuestionBank
+    question_bank = level_exam.level.question_banks.first()
     
     if not question_bank:
         return Response({
@@ -3399,19 +3127,49 @@ def submit_level_exam(request, attempt_id):
         # تصحيح Writing Questions (AI Grading)
         writing_ids = generated_questions.get('writing', [])
         writing_questions = WritingQuestion.objects.filter(id__in=writing_ids)
-        
+
         for wq in writing_questions:
             max_score += wq.points
             answer_key = f"writing_{wq.id}"
             student_answer = answers.get(answer_key, '')
             
             if student_answer:
-                # Mock AI Grading (Replace with actual AI service)
-                word_count = len(student_answer.split())
-                
-                if word_count >= wq.min_words and word_count <= wq.max_words:
-                    ai_score = wq.points * (wq.pass_threshold / 100)
-                    total_score += ai_score
+                try:
+                    # ✅ استخدام AI Grading Service
+                    logger.info(f"Grading writing question {wq.id} for Level Exam")
+                    
+                    ai_result = ai_grading_service.grade_writing_question(
+                        question_text=wq.question_text,
+                        student_answer=student_answer,
+                        sample_answer=wq.sample_answer or '',
+                        rubric=wq.rubric or '',
+                        max_points=wq.points,
+                        min_words=wq.min_words,
+                        max_words=wq.max_words,
+                        pass_threshold=wq.pass_threshold
+                    )
+                    
+                    # ✅ إضافة النقطة (Binary: 0 or 1)
+                    total_score += ai_result['score']
+                    
+                    logger.info(
+                        f"Writing Q{wq.id}: Raw={ai_result['raw_score']}/{wq.points}, "
+                        f"Percentage={ai_result['percentage']:.1f}%, "
+                        f"Binary Score={ai_result['score']}/1, "
+                        f"Cost=${ai_result['cost']:.6f}"
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"AI Grading Error for Writing Q{wq.id}: {str(e)}")
+                    
+                    # ⚠️ Fallback: استخدام word count check بسيط
+                    word_count = len(student_answer.split())
+                    if wq.min_words <= word_count <= wq.max_words:
+                        total_score += 1
+                        logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=1")
+                    else:
+                        logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=0")
+
         
         # حساب النسبة المئوية
         percentage = (total_score / max_score * 100) if max_score > 0 else 0

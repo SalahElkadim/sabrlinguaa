@@ -9,7 +9,7 @@ from levels.models import (
     UnitExam, LevelExam,
     StudentLevel, StudentUnit, StudentLesson,
     StudentUnitExamAttempt, StudentLevelExamAttempt,
-    QuestionBank
+    LevelsUnitsQuestionBank
 )
 
 from sabr_questions.models import (
@@ -128,7 +128,7 @@ class UnitDetailSerializer(serializers.ModelSerializer):
         return hasattr(obj, 'exam')
     
     def get_has_question_bank(self, obj):
-        return obj.question_bank.exists()
+        return obj.question_banks.exists()
 
 
 class UnitCreateUpdateSerializer(serializers.ModelSerializer):
@@ -139,13 +139,13 @@ class UnitCreateUpdateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """
-        عند إنشاء Unit جديد، ننشئ QuestionBank تلقائياً
+        عند إنشاء Unit جديد، ننشئ LevelsUnitsQuestionBank تلقائياً
         """
         with transaction.atomic():
             unit = Unit.objects.create(**validated_data)
             
-            # ✅ إنشاء QuestionBank تلقائياً
-            QuestionBank.objects.create(
+            # ✅ إنشاء LevelsUnitsQuestionBank تلقائياً
+            LevelsUnitsQuestionBank.objects.create(
                 unit=unit,
                 title=f"Question Bank - {unit.title}",
                 description=f"Automatically created for {unit.title}"
@@ -509,14 +509,14 @@ class StudentLessonSerializer(serializers.ModelSerializer):
 # 7. QUESTION BANK SERIALIZERS
 # ============================================
 
-class QuestionBankListSerializer(serializers.ModelSerializer):
+class LevelsUnitsQuestionBankListSerializer(serializers.ModelSerializer):
     """عرض قائمة بنوك الأسئلة (مبسط)"""
     unit_title = serializers.CharField(source='unit.title', read_only=True)
     level_code = serializers.CharField(source='level.code', read_only=True)
     total_questions = serializers.SerializerMethodField()
     
     class Meta:
-        model = QuestionBank
+        model = LevelsUnitsQuestionBank
         fields = [
             'id', 'title', 'description',
             'unit', 'unit_title',
@@ -529,7 +529,7 @@ class QuestionBankListSerializer(serializers.ModelSerializer):
         return obj.get_total_questions()
 
 
-class QuestionBankDetailSerializer(serializers.ModelSerializer):
+class LevelsUnitsQuestionBankDetailSerializer(serializers.ModelSerializer):
     """عرض تفاصيل بنك الأسئلة"""
     unit_details = UnitNestedSerializer(source='unit', read_only=True)
     level_details = LevelListSerializer(source='level', read_only=True)
@@ -537,7 +537,7 @@ class QuestionBankDetailSerializer(serializers.ModelSerializer):
     readiness = serializers.SerializerMethodField()
     
     class Meta:
-        model = QuestionBank
+        model = LevelsUnitsQuestionBank
         fields = [
             'id', 'title', 'description',
             'unit', 'unit_details',
@@ -594,10 +594,10 @@ class QuestionBankDetailSerializer(serializers.ModelSerializer):
         }
 
 
-class QuestionBankCreateUpdateSerializer(serializers.ModelSerializer):
+class LevelsUnitsQuestionBankCreateUpdateSerializer(serializers.ModelSerializer):
     """إنشاء/تعديل بنك الأسئلة"""
     class Meta:
-        model = QuestionBank
+        model = LevelsUnitsQuestionBank
         fields = ['unit', 'level', 'title', 'description']
     
     def validate(self, data):

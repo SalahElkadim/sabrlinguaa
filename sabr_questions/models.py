@@ -208,13 +208,22 @@ class VocabularyQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel, UsageT
     )
     
     # ✅ إضافة question_bank
-    question_bank = models.ForeignKey(
-        'placement_test.QuestionBank',
+    placement_question_bank = models.ForeignKey(
+        'placement_test.PlacementQuestionBank',
         on_delete=models.CASCADE,
-        related_name='vocabulary_questions',
-        null=True,  
+        related_name='placement_vocabulary_questions',
+        null=True,
         blank=True,
-        verbose_name="بنك الأسئلة"
+        verbose_name="بنك أسئلة Placement"
+        )
+
+    levels_units_question_bank = models.ForeignKey(
+        'levels.LevelsUnitsQuestionBank',
+        on_delete=models.CASCADE,
+        related_name='levels_vocabulary_questions',
+        null=True,
+        blank=True,
+        verbose_name="بنك أسئلة Levels/Units"
     )
     
     class Meta:
@@ -282,15 +291,23 @@ class GrammarQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel, UsageType
     )
     
     # ✅ إضافة question_bank
-    question_bank = models.ForeignKey(
-        'placement_test.QuestionBank',
+    placement_question_bank = models.ForeignKey(
+        'placement_test.PlacementQuestionBank',
         on_delete=models.CASCADE,
-        related_name='grammar_questions',
+        related_name='placement_grammar_questions',
         null=True,
         blank=True,
-        verbose_name="بنك الأسئلة"
+        verbose_name="بنك أسئلة Placement"
+        )
+
+    levels_units_question_bank = models.ForeignKey(
+        'levels.LevelsUnitsQuestionBank',
+        on_delete=models.CASCADE,
+        related_name='levels_grammar_questions',
+        null=True,
+        blank=True,
+        verbose_name="بنك أسئلة Levels/Units"
     )
-    
     class Meta:
         verbose_name = "سؤال قواعد"
         verbose_name_plural = "أسئلة القواعد"
@@ -323,15 +340,24 @@ class ReadingPassage(TimeStampedModel, OrderedModel, UsageTypeMixin):
     )
     
     # ✅ إضافة question_bank
-    question_bank = models.ForeignKey(
-        'placement_test.QuestionBank',
+    placement_question_bank = models.ForeignKey(
+        'placement_test.PlacementQuestionBank',
         on_delete=models.CASCADE,
-        related_name='reading_passages',
+        related_name='placement_reading_passages',
         null=True,
         blank=True,
-        verbose_name="بنك الأسئلة"
+        verbose_name="بنك أسئلة Placement"
     )
-    
+
+    levels_units_question_bank = models.ForeignKey(
+        'levels.LevelsUnitsQuestionBank',
+        on_delete=models.CASCADE,
+        related_name='levels_reading_passages',
+        null=True,
+        blank=True,
+        verbose_name="بنك أسئلة Levels/Units"
+    )
+        
     class Meta:
         verbose_name = "قطعة قراءة"
         verbose_name_plural = "قطع القراءة"
@@ -400,16 +426,23 @@ class ListeningAudio(TimeStampedModel, OrderedModel, UsageTypeMixin):
         verbose_name="مدة التسجيل"
     )
     
-    # ✅ إضافة question_bank
-    question_bank = models.ForeignKey(
-        'placement_test.QuestionBank',
+    placement_question_bank = models.ForeignKey(
+        'placement_test.PlacementQuestionBank',
         on_delete=models.CASCADE,
-        related_name='listening_audios',
+        related_name='placement_listening_audios',
         null=True,
         blank=True,
-        verbose_name="بنك الأسئلة"
+        verbose_name="بنك أسئلة Placement"
     )
-    
+
+    levels_units_question_bank = models.ForeignKey(
+        'levels.LevelsUnitsQuestionBank',
+        on_delete=models.CASCADE,
+        related_name='levels_listening_audios',
+        null=True,
+        blank=True,
+        verbose_name="بنك أسئلة Levels/Units"
+    )
     class Meta:
         verbose_name = "تسجيل صوتي"
         verbose_name_plural = "التسجيلات الصوتية"
@@ -483,15 +516,23 @@ class SpeakingVideo(TimeStampedModel, OrderedModel, UsageTypeMixin):
         folder='speaking/thumbnails',
     )
     
-    # ✅ إضافة question_bank
-    question_bank = models.ForeignKey(
-        'placement_test.QuestionBank',
+    placement_question_bank = models.ForeignKey(
+        'placement_test.PlacementQuestionBank',
         on_delete=models.CASCADE,
-        related_name='speaking_videos',
+        related_name='placement_speaking_videos',
         null=True,
         blank=True,
-        verbose_name="بنك الأسئلة"
+        verbose_name="بنك أسئلة Placement"
     )
+
+    levels_units_question_bank = models.ForeignKey(
+        'levels.LevelsUnitsQuestionBank',
+        on_delete=models.CASCADE,
+        related_name='levels_speaking_videos',
+        null=True,
+        blank=True,
+        verbose_name="بنك أسئلة Levels/Units")
+    
     
     class Meta:
         verbose_name = "فيديو تحدث"
@@ -591,15 +632,22 @@ class WritingQuestion(TimeStampedModel, OrderedModel, UsageTypeMixin):
         help_text="النسبة المئوية المطلوبة لاعتبار الإجابة صحيحة (default: 60%)"
     )
     
-    # ✅ إضافة question_bank
-    question_bank = models.ForeignKey(
-        'placement_test.QuestionBank',
+    placement_question_bank = models.ForeignKey(
+        'placement_test.PlacementQuestionBank',
         on_delete=models.CASCADE,
-        related_name='writing_questions',
+        related_name='placement_writing_questions',
         null=True,
         blank=True,
-        verbose_name="بنك الأسئلة"
+        verbose_name="بنك أسئلة Placement"
     )
+
+    levels_units_question_bank = models.ForeignKey(
+        'levels.LevelsUnitsQuestionBank',
+        on_delete=models.CASCADE,
+        related_name='levels_writing_questions',
+        null=True,
+        blank=True,
+        verbose_name="بنك أسئلة Levels/Units")
     
     class Meta:
         verbose_name = "سؤال كتابة"

@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 import random
 
-from placement_test.models import QuestionBank, StudentPlacementTestAttempt,PlacementTest,StudentPlacementTestAnswer
+from placement_test.models import PlacementQuestionBank , StudentPlacementTestAttempt, PlacementTest, StudentPlacementTestAnswer
 from sabr_questions.models import (
     VocabularyQuestionSet,
     VocabularyQuestion,
@@ -23,10 +23,10 @@ from sabr_questions.models import (
 )
 from .serializers import (
     # Question Bank Serializers
-    QuestionBankSerializer,
-    QuestionBankCreateSerializer,
-    QuestionBankDetailSerializer,
-    QuestionBankUpdateSerializer,
+    PlacementQuestionBankSerializer,
+    PlacementQuestionBankCreateSerializer,
+    PlacementQuestionBankDetailSerializer,
+    PlacementQuestionBankUpdateSerializer,
     # Vocabulary Serializers
     CreateVocabularyQuestionSerializer,
     VocabularyQuestionSerializer,
@@ -79,13 +79,13 @@ def create_question_bank(request):
         "description": "بنك أسئلة شامل"  // اختياري
     }
     """
-    serializer = QuestionBankCreateSerializer(data=request.data)
+    serializer = PlacementQuestionBankCreateSerializer(data=request.data)
     
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     question_bank = serializer.save()
-    result_serializer = QuestionBankDetailSerializer(question_bank)
+    result_serializer = PlacementQuestionBankDetailSerializer(question_bank)
     
     return Response({
         'message': 'تم إنشاء بنك الأسئلة بنجاح',
@@ -101,8 +101,8 @@ def list_question_banks(request):
     
     GET /api/question-banks/
     """
-    question_banks = QuestionBank.objects.all().order_by('-created_at')
-    serializer = QuestionBankSerializer(question_banks, many=True)
+    question_banks = PlacementQuestionBank .objects.all().order_by('-created_at')
+    serializer = PlacementQuestionBankSerializer(question_banks, many=True)
     
     return Response({
         'total_banks': question_banks.count(),
@@ -118,8 +118,8 @@ def get_question_bank(request, bank_id):
     
     GET /api/question-banks/{bank_id}/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
-    serializer = QuestionBankDetailSerializer(question_bank)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
+    serializer = PlacementQuestionBankDetailSerializer(question_bank)
     
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -139,10 +139,10 @@ def update_question_bank(request, bank_id):
         "description": "وصف جديد"
     }
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     partial = request.method == 'PATCH'
-    serializer = QuestionBankUpdateSerializer(
+    serializer = PlacementQuestionBankUpdateSerializer(
         question_bank,
         data=request.data,
         partial=partial
@@ -152,7 +152,7 @@ def update_question_bank(request, bank_id):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     question_bank = serializer.save()
-    result_serializer = QuestionBankDetailSerializer(question_bank)
+    result_serializer = PlacementQuestionBankDetailSerializer(question_bank)
     
     return Response({
         'message': 'تم تحديث بنك الأسئلة بنجاح',
@@ -170,7 +170,7 @@ def delete_question_bank(request, bank_id):
     
     ⚠️ حذف نهائي - سيتم حذف جميع الأسئلة المرتبطة بالبنك
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     title = question_bank.title
     question_bank.delete()
@@ -190,7 +190,7 @@ def question_bank_statistics(request, bank_id):
     
     GET /api/question-banks/{bank_id}/statistics/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     # عدد الأسئلة الحالية
     vocab_count = question_bank.get_vocabulary_count()
@@ -262,7 +262,7 @@ def add_vocabulary_question(request, bank_id):
     
     POST /api/question-banks/{bank_id}/add-vocabulary-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     serializer = CreateVocabularyQuestionSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -290,7 +290,7 @@ def add_vocabulary_question(request, bank_id):
         vocabulary_question = VocabularyQuestion.objects.create(
             question_set=question_set,
             usage_type='QUESTION_BANK',
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             **serializer.validated_data
         )
     
@@ -317,7 +317,7 @@ def add_grammar_question(request, bank_id):
     
     POST /api/question-banks/{bank_id}/add-grammar-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     serializer = CreateGrammarQuestionSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -345,7 +345,7 @@ def add_grammar_question(request, bank_id):
         grammar_question = GrammarQuestion.objects.create(
             question_set=question_set,
             usage_type='QUESTION_BANK',
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             **serializer.validated_data
         )
     
@@ -372,7 +372,7 @@ def create_reading_passage(request, bank_id):
     
     POST /api/question-banks/{bank_id}/create-reading-passage/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     serializer = ReadingPassageSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -380,7 +380,7 @@ def create_reading_passage(request, bank_id):
     
     reading_passage = ReadingPassage.objects.create(
         usage_type='QUESTION_BANK',
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -400,11 +400,11 @@ def add_reading_question(request, bank_id, passage_id):
     
     POST /api/question-banks/{bank_id}/reading-passages/{passage_id}/add-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     reading_passage = get_object_or_404(
         ReadingPassage,
         id=passage_id,
-        question_bank=question_bank
+        placement_question_bank=question_bank
     )
     
     serializer = CreateReadingQuestionSerializer(data=request.data)
@@ -440,7 +440,7 @@ def create_listening_audio(request, bank_id):
     
     POST /api/question-banks/{bank_id}/create-listening-audio/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     serializer = ListeningAudioSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -448,7 +448,7 @@ def create_listening_audio(request, bank_id):
     
     listening_audio = ListeningAudio.objects.create(
         usage_type='QUESTION_BANK',
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -468,11 +468,11 @@ def add_listening_question(request, bank_id, audio_id):
     
     POST /api/question-banks/{bank_id}/listening-audios/{audio_id}/add-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     listening_audio = get_object_or_404(
         ListeningAudio,
         id=audio_id,
-        question_bank=question_bank
+        placement_question_bank=question_bank
     )
     
     serializer = CreateListeningQuestionSerializer(data=request.data)
@@ -508,7 +508,7 @@ def create_speaking_video(request, bank_id):
     
     POST /api/question-banks/{bank_id}/create-speaking-video/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     serializer = SpeakingVideoSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -516,7 +516,7 @@ def create_speaking_video(request, bank_id):
     
     speaking_video = SpeakingVideo.objects.create(
         usage_type='QUESTION_BANK',
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -536,11 +536,11 @@ def add_speaking_question(request, bank_id, video_id):
     
     POST /api/question-banks/{bank_id}/speaking-videos/{video_id}/add-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     speaking_video = get_object_or_404(
         SpeakingVideo,
         id=video_id,
-        question_bank=question_bank
+        placement_question_bank=question_bank
     )
     
     serializer = CreateSpeakingQuestionSerializer(data=request.data)
@@ -576,7 +576,7 @@ def add_writing_question(request, bank_id):
     
     POST /api/question-banks/{bank_id}/add-writing-question/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     serializer = CreateWritingQuestionSerializer(data=request.data)
     
     if not serializer.is_valid():
@@ -584,7 +584,7 @@ def add_writing_question(request, bank_id):
     
     writing_question = WritingQuestion.objects.create(
         usage_type='QUESTION_BANK',
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         **serializer.validated_data
     )
     
@@ -618,7 +618,7 @@ def get_all_bank_questions(request, bank_id):
     
     Example: GET /api/question-banks/1/all-questions/?question_type=vocabulary
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     question_type = request.query_params.get('question_type', None)
     
     response_data = {
@@ -633,7 +633,7 @@ def get_all_bank_questions(request, bank_id):
     # Vocabulary Questions
     if not question_type or question_type == 'vocabulary':
         vocabulary_questions = VocabularyQuestion.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).select_related('question_set').order_by('order', 'id')
         
@@ -645,7 +645,7 @@ def get_all_bank_questions(request, bank_id):
     # Grammar Questions
     if not question_type or question_type == 'grammar':
         grammar_questions = GrammarQuestion.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).select_related('question_set').order_by('order', 'id')
         
@@ -657,7 +657,7 @@ def get_all_bank_questions(request, bank_id):
     # Reading Passages & Questions
     if not question_type or question_type == 'reading':
         reading_passages = ReadingPassage.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).prefetch_related('questions').order_by('order', 'id')
         
@@ -684,7 +684,7 @@ def get_all_bank_questions(request, bank_id):
     # Listening Audios & Questions
     if not question_type or question_type == 'listening':
         listening_audios = ListeningAudio.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).prefetch_related('questions').order_by('order', 'id')
         
@@ -711,7 +711,7 @@ def get_all_bank_questions(request, bank_id):
     # Speaking Videos & Questions
     if not question_type or question_type == 'speaking':
         speaking_videos = SpeakingVideo.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).prefetch_related('questions').order_by('order', 'id')
         
@@ -738,7 +738,7 @@ def get_all_bank_questions(request, bank_id):
     # Writing Questions
     if not question_type or question_type == 'writing':
         writing_questions = WritingQuestion.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).order_by('order', 'id')
         
@@ -762,10 +762,10 @@ def list_vocabulary_questions(request, bank_id):
     
     GET /api/question-banks/{bank_id}/vocabulary-questions/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     questions = VocabularyQuestion.objects.filter(
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         is_active=True
     ).select_related('question_set').order_by('order', 'id')
     
@@ -789,10 +789,10 @@ def list_grammar_questions(request, bank_id):
     
     GET /api/question-banks/{bank_id}/grammar-questions/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     questions = GrammarQuestion.objects.filter(
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         is_active=True
     ).select_related('question_set').order_by('order', 'id')
     
@@ -816,10 +816,10 @@ def list_reading_passages(request, bank_id):
     
     GET /api/question-banks/{bank_id}/reading-passages/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     passages = ReadingPassage.objects.filter(
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         is_active=True
     ).prefetch_related('questions').order_by('order', 'id')
     
@@ -843,10 +843,10 @@ def list_listening_audios(request, bank_id):
     
     GET /api/question-banks/{bank_id}/listening-audios/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     audios = ListeningAudio.objects.filter(
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         is_active=True
     ).prefetch_related('questions').order_by('order', 'id')
     
@@ -870,10 +870,10 @@ def list_speaking_videos(request, bank_id):
     
     GET /api/question-banks/{bank_id}/speaking-videos/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     videos = SpeakingVideo.objects.filter(
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         is_active=True
     ).prefetch_related('questions').order_by('order', 'id')
     
@@ -897,10 +897,10 @@ def list_writing_questions(request, bank_id):
     
     GET /api/question-banks/{bank_id}/writing-questions/
     """
-    question_bank = get_object_or_404(QuestionBank, id=bank_id)
+    question_bank = get_object_or_404(PlacementQuestionBank , id=bank_id)
     
     questions = WritingQuestion.objects.filter(
-        question_bank=question_bank,
+        placement_question_bank=question_bank,
         is_active=True
     ).order_by('order', 'id')
     
@@ -933,7 +933,7 @@ def create_exam_from_bank(request):
     
     # ✅ البحث عن جميع البنوك الجاهزة للامتحان
     ready_banks = []
-    all_banks = QuestionBank.objects.all()
+    all_banks = PlacementQuestionBank .objects.all()
     
     for bank in all_banks:
         if bank.is_ready_for_exam():
@@ -944,7 +944,7 @@ def create_exam_from_bank(request):
         return Response({
             'error': 'لا يوجد بنوك أسئلة جاهزة للامتحان',
             'message': 'يجب أن يحتوي البنك على الأقل على: 10 vocabulary, 10 grammar, 6 reading, 10 listening, 10 speaking, 4 writing',
-            'available_banks': QuestionBank.objects.count(),
+            'available_banks': PlacementQuestionBank .objects.count(),
             'ready_banks': 0
         }, status=status.HTTP_400_BAD_REQUEST)
     
@@ -1002,7 +1002,7 @@ def create_exam_from_bank(request):
         attempt = StudentPlacementTestAttempt.objects.create(
             student=request.user,
             placement_test=placement_test,
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             status='IN_PROGRESS',
             started_at=timezone.now()
         )
@@ -1074,7 +1074,7 @@ def select_random_questions_from_bank(question_bank):
     # Vocabulary (10 questions)
     vocabulary_ids = list(
         VocabularyQuestion.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -1083,7 +1083,7 @@ def select_random_questions_from_bank(question_bank):
     # Grammar (10 questions)
     grammar_ids = list(
         GrammarQuestion.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )
@@ -1092,7 +1092,7 @@ def select_random_questions_from_bank(question_bank):
     # Reading (6 questions)
     reading_ids = list(
         ReadingQuestion.objects.filter(
-            passage__question_bank=question_bank,
+            passage__placement_question_bank=question_bank,
             passage__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -1102,7 +1102,7 @@ def select_random_questions_from_bank(question_bank):
     # Listening (10 questions)
     listening_ids = list(
         ListeningQuestion.objects.filter(
-            audio__question_bank=question_bank,
+            audio__placement_question_bank=question_bank,
             audio__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -1112,7 +1112,7 @@ def select_random_questions_from_bank(question_bank):
     # Speaking (10 questions)
     speaking_ids = list(
         SpeakingQuestion.objects.filter(
-            video__question_bank=question_bank,
+            video__placement_question_bank=question_bank,
             video__is_active=True,
             is_active=True
         ).values_list('id', flat=True)
@@ -1122,7 +1122,7 @@ def select_random_questions_from_bank(question_bank):
     # Writing (4 questions)
     writing_ids = list(
         WritingQuestion.objects.filter(
-            question_bank=question_bank,
+            placement_question_bank=question_bank,
             is_active=True
         ).values_list('id', flat=True)
     )

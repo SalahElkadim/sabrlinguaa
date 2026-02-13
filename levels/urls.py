@@ -64,19 +64,6 @@ urlpatterns = [
     # 5. EXAM URLS
     # ============================================
     
-    # Unit Exam
-    path('exams/unit/create/', views.create_unit_exam, name='create_unit_exam'),
-    path('exams/unit/', views.list_unit_exams, name='list_unit_exams'),
-    path('exams/unit/<int:exam_id>/', views.get_unit_exam, name='get_unit_exam'),
-    path('exams/unit/<int:exam_id>/update/', views.update_unit_exam, name='update_unit_exam'),
-    path('exams/unit/<int:exam_id>/delete/', views.delete_unit_exam, name='delete_unit_exam'),
-    
-    # Level Exam
-    path('exams/level/create/', views.create_level_exam, name='create_level_exam'),
-    path('exams/level/', views.list_level_exams, name='list_level_exams'),
-    path('exams/level/<int:exam_id>/', views.get_level_exam, name='get_level_exam'),
-    path('exams/level/<int:exam_id>/update/', views.update_level_exam, name='update_level_exam'),
-    path('exams/level/<int:exam_id>/delete/', views.delete_level_exam, name='delete_level_exam'),
     
     # ============================================
     # 6. QUESTION BANK URLS
@@ -124,12 +111,12 @@ urlpatterns = [
     # ============================================
     
     # Unit Exam
-    path('student/exams/unit/<int:exam_id>/start/', views.start_unit_exam, name='start_unit_exam'),
+    path('student/exams/unit/start/<int:unit_id>/', views.start_unit_exam, name='start_unit_exam'),
     path('student/exams/unit/submit/<int:attempt_id>/', views.submit_unit_exam, name='submit_unit_exam'),
     path('student/exams/unit/my-attempts/', views.my_unit_exam_attempts, name='my_unit_exam_attempts'),
     
     # Level Exam
-    path('student/exams/level/<int:exam_id>/start/', views.start_level_exam, name='start_level_exam'),
+    path('student/exams/level/start/<int:level_id>/', views.start_level_exam, name='start_level_exam'),
     path('student/exams/level/submit/<int:attempt_id>/', views.submit_level_exam, name='submit_level_exam'),
     path('student/exams/level/my-attempts/', views.my_level_exam_attempts, name='my_level_exam_attempts'),
 ]

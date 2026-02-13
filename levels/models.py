@@ -72,6 +72,27 @@ class Level(TimeStampedModel, OrderedModel):
     def get_total_lessons(self):
         """إجمالي عدد الدروس في المستوى"""
         return sum(unit.get_lessons_count() for unit in self.units.filter(is_active=True))
+    
+    def save(self, *args, **kwargs):
+        """عند إنشاء Level جديد، ننشئ LevelExam تلقائياً"""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # إنشاء LevelExam تلقائياً
+            LevelExam.objects.get_or_create(
+                level=self,
+                defaults={
+                    'title': f"{self.code} - Level Exam",
+                    'time_limit': 60,
+                    'vocabulary_count': 12,
+                    'grammar_count': 12,
+                    'reading_questions_count': 20,
+                    'listening_questions_count': 6,
+                    'speaking_questions_count': 5,
+                    'writing_questions_count': 5
+                }
+            )
 
 
 class Unit(TimeStampedModel, OrderedModel):
@@ -103,6 +124,27 @@ class Unit(TimeStampedModel, OrderedModel):
     def get_lessons_count(self):
         """عدد الدروس"""
         return self.lessons.filter(is_active=True).count()
+    
+    def save(self, *args, **kwargs):
+        """عند إنشاء Unit جديد، ننشئ UnitExam تلقائياً"""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # إنشاء UnitExam تلقائياً
+            UnitExam.objects.get_or_create(
+                unit=self,
+                defaults={
+                    'title': f"{self.title} - Final Exam",
+                    'time_limit': 35,
+                    'vocabulary_count': 8,
+                    'grammar_count': 8,
+                    'reading_questions_count': 10,
+                    'listening_questions_count': 3,
+                    'speaking_questions_count': 3,
+                    'writing_questions_count': 3
+                }
+            )
 
 
 class Lesson(TimeStampedModel, OrderedModel):
@@ -827,7 +869,7 @@ class StudentLevelExamAttempt(TimeStampedModel):
 # Question Bank for Units & Levels
 # ============================================
 
-class QuestionBank(TimeStampedModel):
+class LevelsUnitsQuestionBank(TimeStampedModel):
     """
     بنك الأسئلة - يمكن ربطه بـ Unit أو Level
     """
@@ -837,7 +879,7 @@ class QuestionBank(TimeStampedModel):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='question_bank',
+        related_name='question_banks',
         verbose_name="الوحدة"
     )
     level = models.ForeignKey(
@@ -845,7 +887,7 @@ class QuestionBank(TimeStampedModel):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
-        related_name='question_bank',
+        related_name='question_banks',
         verbose_name="المستوى"
     )
     
@@ -880,12 +922,11 @@ class QuestionBank(TimeStampedModel):
         self.clean()
         super().save(*args, **kwargs)
     
-    # نفس الـ Methods من placement_test
     def get_vocabulary_count(self):
         """عدد أسئلة المفردات"""
         from sabr_questions.models import VocabularyQuestion
         return VocabularyQuestion.objects.filter(
-            question_bank=self,
+            levels_units_question_bank=self,  # ✅ 
             is_active=True
         ).count()
     
@@ -893,47 +934,67 @@ class QuestionBank(TimeStampedModel):
         """عدد أسئلة القواعد"""
         from sabr_questions.models import GrammarQuestion
         return GrammarQuestion.objects.filter(
-            question_bank=self,
+            levels_units_question_bank=self,  # ✅
             is_active=True
         ).count()
     
     def get_reading_count(self):
         """عدد أسئلة القراءة"""
-        from sabr_questions.models import ReadingPassage
+        from sabr_questions.models import ReadingPassage, ReadingQuestion
         passages = ReadingPassage.objects.filter(
-            question_bank=self,
+            levels_units_question_bank=self,  # ✅
             is_active=True
         )
-        return sum(p.get_questions_count() for p in passages)
+        if not passages.exists():
+            return 0
+        
+        total = ReadingQuestion.objects.filter(
+            passage__in=passages,
+            is_active=True
+        ).count()
+        return total
     
     def get_listening_count(self):
         """عدد أسئلة الاستماع"""
-        from sabr_questions.models import ListeningAudio
+        from sabr_questions.models import ListeningAudio, ListeningQuestion
         audios = ListeningAudio.objects.filter(
-            question_bank=self,
+            levels_units_question_bank=self,  # ✅
             is_active=True
         )
-        return sum(a.get_questions_count() for a in audios)
+        if not audios.exists():
+            return 0
+        
+        total = ListeningQuestion.objects.filter(
+            audio__in=audios,
+            is_active=True
+        ).count()
+        return total
     
     def get_speaking_count(self):
         """عدد أسئلة التحدث"""
-        from sabr_questions.models import SpeakingVideo
+        from sabr_questions.models import SpeakingVideo, SpeakingQuestion
         videos = SpeakingVideo.objects.filter(
-            question_bank=self,
+            levels_units_question_bank=self,  # ✅
             is_active=True
         )
-        return sum(v.get_questions_count() for v in videos)
+        if not videos.exists():
+            return 0
+        
+        total = SpeakingQuestion.objects.filter(
+            video__in=videos,
+            is_active=True
+        ).count()
+        return total
     
     def get_writing_count(self):
         """عدد أسئلة الكتابة"""
         from sabr_questions.models import WritingQuestion
         return WritingQuestion.objects.filter(
-            question_bank=self,
+            levels_units_question_bank=self,  # ✅
             is_active=True
         ).count()
     
     def get_total_questions(self):
-        """إجمالي الأسئلة في البنك"""
         return (
             self.get_vocabulary_count() +
             self.get_grammar_count() +
@@ -942,20 +1003,7 @@ class QuestionBank(TimeStampedModel):
             self.get_speaking_count() +
             self.get_writing_count()
         )
-    
     def is_ready_for_unit_exam(self):
-        """
-        التحقق من جاهزية البنك لامتحان الوحدة
-        الحد الأدنى المطلوب (حسب UnitExam default values):
-        - 8 vocabulary
-        - 8 grammar
-        - 10 reading questions (across passages)
-        - 3 listening
-        - 3 speaking
-        - 3 writing
-        """
-        if not self.unit:
-            return False
         
         return (
             self.get_vocabulary_count() >= 8 and
@@ -965,20 +1013,8 @@ class QuestionBank(TimeStampedModel):
             self.get_speaking_count() >= 3 and
             self.get_writing_count() >= 3
         )
-    
+
     def is_ready_for_level_exam(self):
-        """
-        التحقق من جاهزية البنك لامتحان المستوى
-        الحد الأدنى المطلوب (حسب LevelExam default values):
-        - 12 vocabulary
-        - 12 grammar
-        - 20 reading questions
-        - 6 listening
-        - 5 speaking
-        - 5 writing
-        """
-        if not self.level:
-            return False
         
         return (
             self.get_vocabulary_count() >= 12 and

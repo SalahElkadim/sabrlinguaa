@@ -227,10 +227,12 @@ class PlacementTestQuestionBank(TimeStampedModel):
         return types.get(model_name, model_name)
 
 
-
-class QuestionBank(models.Model):
+# ============================================
+# ✅ تم تغيير الاسم من QuestionBank إلى PlacementQuestionBank
+# ============================================
+class PlacementQuestionBank(models.Model):
     """
-    بنك الأسئلة
+    بنك أسئلة اختبار تحديد المستوى
     """
     title = models.CharField(max_length=200, verbose_name="عنوان البنك")
     description = models.TextField(
@@ -243,18 +245,18 @@ class QuestionBank(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name="تاريخ التحديث")
     
     class Meta:
-        verbose_name = "بنك أسئلة"
-        verbose_name_plural = "بنوك الأسئلة"
+        verbose_name = "بنك أسئلة Placement"
+        verbose_name_plural = "بنوك أسئلة Placement"
         ordering = ['-created_at']
     
     def __str__(self):
-        return self.title
+        return f"Placement Bank: {self.title}"
     
     def get_vocabulary_count(self):
         """عدد أسئلة المفردات"""
         from sabr_questions.models import VocabularyQuestion
         return VocabularyQuestion.objects.filter(
-            question_bank=self,
+            placement_question_bank=self,  # ✅ تم التعديل
             is_active=True
         ).count()
     
@@ -262,7 +264,7 @@ class QuestionBank(models.Model):
         """عدد أسئلة القواعد"""
         from sabr_questions.models import GrammarQuestion
         return GrammarQuestion.objects.filter(
-            question_bank=self,
+            placement_question_bank=self,  # ✅ تم التعديل
             is_active=True
         ).count()
     
@@ -270,7 +272,7 @@ class QuestionBank(models.Model):
         """عدد أسئلة القراءة"""
         from sabr_questions.models import ReadingPassage
         passages = ReadingPassage.objects.filter(
-            question_bank=self,
+            placement_question_bank=self,  # ✅ تم التعديل
             is_active=True
         )
         return sum(p.get_questions_count() for p in passages)
@@ -279,7 +281,7 @@ class QuestionBank(models.Model):
         """عدد أسئلة الاستماع"""
         from sabr_questions.models import ListeningAudio
         audios = ListeningAudio.objects.filter(
-            question_bank=self,
+            placement_question_bank=self,  # ✅ تم التعديل
             is_active=True
         )
         return sum(a.get_questions_count() for a in audios)
@@ -288,7 +290,7 @@ class QuestionBank(models.Model):
         """عدد أسئلة التحدث"""
         from sabr_questions.models import SpeakingVideo
         videos = SpeakingVideo.objects.filter(
-            question_bank=self,
+            placement_question_bank=self,  # ✅ تم التعديل
             is_active=True
         )
         return sum(v.get_questions_count() for v in videos)
@@ -297,7 +299,7 @@ class QuestionBank(models.Model):
         """عدد أسئلة الكتابة"""
         from sabr_questions.models import WritingQuestion
         return WritingQuestion.objects.filter(
-            question_bank=self,
+            placement_question_bank=self,  # ✅ تم التعديل
             is_active=True
         ).count()
     
@@ -350,7 +352,7 @@ class StudentPlacementTestAttempt(TimeStampedModel):
         verbose_name="اختبار تحديد المستوى"
     )
     question_bank = models.ForeignKey(
-        QuestionBank,
+        PlacementQuestionBank,  # ✅ تم التعديل
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -481,6 +483,7 @@ class StudentPlacementTestAttempt(TimeStampedModel):
         elapsed_minutes = elapsed.total_seconds() / 60
         return elapsed_minutes >= self.placement_test.duration_minutes
 
+
 class StudentPlacementTestAnswer(TimeStampedModel):
     """
     إجابة الطالب على سؤال في اختبار تحديد المستوى
@@ -610,6 +613,7 @@ class StudentPlacementTestAnswer(TimeStampedModel):
             'writingquestion': 'كتابة'
         }
         return types.get(model_name, model_name)
+
 
 # ============================================
 # Helper Functions
