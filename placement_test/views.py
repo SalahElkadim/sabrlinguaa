@@ -1002,7 +1002,7 @@ def create_exam_from_bank(request):
         attempt = StudentPlacementTestAttempt.objects.create(
             student=request.user,
             placement_test=placement_test,
-            placement_question_bank=question_bank,
+            question_bank=question_bank,
             status='IN_PROGRESS',
             started_at=timezone.now()
         )
