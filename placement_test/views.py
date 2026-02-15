@@ -1130,13 +1130,12 @@ def select_random_questions_from_bank(question_bank):
     
     return selected_questions
 
-
 def fetch_selected_questions(selected_questions):
     """
-    جلب الأسئلة الفعلية من الـ IDs
+    جلب الأسئلة الفعلية من الـ IDs مع إضافة URLs للميديا
     
     Returns:
-        dict: الأسئلة مع جميع التفاصيل
+        dict: الأسئلة مع جميع التفاصيل والـ URLs
     """
     exam_questions = {}
     
@@ -1158,17 +1157,43 @@ def fetch_selected_questions(selected_questions):
     ).select_related('passage')
     exam_questions['reading'] = ReadingQuestionSerializer(reading_questions, many=True).data
     
-    # Listening
+    # Listening - مع إضافة الـ audio URLs
     listening_questions = ListeningQuestion.objects.filter(
         id__in=selected_questions['listening']
     ).select_related('audio')
     exam_questions['listening'] = ListeningQuestionSerializer(listening_questions, many=True).data
     
-    # Speaking
+    # ✅ إضافة الـ audio URLs (معدل حسب الموديل)
+    for question in exam_questions['listening']:
+        try:
+            audio = ListeningAudio.objects.get(id=question['audio'])
+            question['audio_url'] = audio.audio_file.url if audio.audio_file else None
+            question['audio_transcript'] = audio.transcript if hasattr(audio, 'transcript') else None
+            question['audio_duration'] = audio.duration  # ✅ duration (مش duration_seconds)
+        except ListeningAudio.DoesNotExist:
+            question['audio_url'] = None
+            question['audio_transcript'] = None
+            question['audio_duration'] = None
+    
+    # Speaking - مع إضافة الـ video URLs
     speaking_questions = SpeakingQuestion.objects.filter(
         id__in=selected_questions['speaking']
     ).select_related('video')
     exam_questions['speaking'] = SpeakingQuestionSerializer(speaking_questions, many=True).data
+    
+    # ✅ إضافة الـ video URLs (معدل حسب الموديل)
+    for question in exam_questions['speaking']:
+        try:
+            video = SpeakingVideo.objects.get(id=question['video'])
+            question['video_url'] = video.video_file.url if video.video_file else None
+            question['video_description'] = video.description if hasattr(video, 'description') else None
+            question['video_duration'] = video.duration  # ✅ duration (مش duration_seconds)
+            question['video_thumbnail'] = video.thumbnail.url if hasattr(video, 'thumbnail') and video.thumbnail else None
+        except SpeakingVideo.DoesNotExist:
+            question['video_url'] = None
+            question['video_description'] = None
+            question['video_duration'] = None
+            question['video_thumbnail'] = None
     
     # Writing
     writing_questions = WritingQuestion.objects.filter(
@@ -1177,8 +1202,6 @@ def fetch_selected_questions(selected_questions):
     exam_questions['writing'] = WritingQuestionSerializer(writing_questions, many=True).data
     
     return exam_questions
-
-
 # ============================================
 # 5. STUDENT EXAM SUBMISSION & RESULTS
 # ============================================
