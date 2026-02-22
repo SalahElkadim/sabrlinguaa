@@ -2722,33 +2722,9 @@ def start_unit_exam(request, unit_id):
         }
     }, status=status.HTTP_201_CREATED)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_unit_exam(request, attempt_id):
-    """
-    تسليم امتحان الوحدة
-    
-    POST /api/levels/student/exams/unit/submit/{attempt_id}/
-    
-    Body:
-    {
-        "answers": {
-            "vocabulary_1": "A",
-            "vocabulary_5": "B",
-            "grammar_2": "C",
-            "reading_3": "D",
-            "listening_4": "A",
-            "speaking_6": "B",
-            "writing_7": "My answer text here..."
-        }
-    }
-    
-    ✅ Grades MCQ automatically
-    ✅ Sends Writing to AI for grading
-    ✅ Calculates final score
-    ✅ Updates StudentUnit if passed
-    """
     attempt = get_object_or_404(
         StudentUnitExamAttempt,
         id=attempt_id,
@@ -2762,7 +2738,6 @@ def submit_unit_exam(request, attempt_id):
             'passed': attempt.passed
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # التحقق من البيانات
     answers = request.data.get('answers', {})
     
     if not answers:
@@ -2771,56 +2746,61 @@ def submit_unit_exam(request, attempt_id):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     with transaction.atomic():
-        # حفظ الإجابات
         attempt.answers = answers
         
-        # حساب الوقت المستغرق
         time_taken = (timezone.now() - attempt.started_at).total_seconds()
         attempt.time_taken = int(time_taken)
         
-        # تصحيح الأسئلة
         total_score = 0
         max_score = 0
         
         generated_questions = attempt.generated_questions
         
-        # تصحيح MCQ Questions
-        mcq_types = ['vocabulary', 'grammar', 'reading', 'listening', 'speaking']
+        # ✅ تصحيح MCQ - النظام الجديد (arrays)
+        mcq_config = {
+            'vocabulary': VocabularyQuestion,
+            'grammar': GrammarQuestion,
+            'reading': ReadingQuestion,
+            'listening': ListeningQuestion,
+            'speaking': SpeakingQuestion,
+        }
         
-        for q_type in mcq_types:
+        for q_type, QuestionModel in mcq_config.items():
             question_ids = generated_questions.get(q_type, [])
+            questions = QuestionModel.objects.filter(id__in=question_ids)
             
-            if q_type == 'vocabulary':
-                questions = VocabularyQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'grammar':
-                questions = GrammarQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'reading':
-                questions = ReadingQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'listening':
-                questions = ListeningQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'speaking':
-                questions = SpeakingQuestion.objects.filter(id__in=question_ids)
+            # ✅ تحويل الـ array لـ dict للبحث السريع
+            # answers[q_type] = [{"question_id": 1, "selected_choice": "A"}, ...]
+            type_answers = {
+                str(ans['question_id']): ans['selected_choice']
+                for ans in answers.get(q_type, [])
+                if 'question_id' in ans and 'selected_choice' in ans
+            }
             
             for q in questions:
                 max_score += q.points
-                answer_key = f"{q_type}_{q.id}"
-                student_answer = answers.get(answer_key)
+                student_answer = type_answers.get(str(q.id))
                 
                 if student_answer == q.correct_answer:
                     total_score += q.points
         
-        # تصحيح Writing Questions (AI Grading)
+        # ✅ تصحيح Writing - النظام الجديد
         writing_ids = generated_questions.get('writing', [])
         writing_questions = WritingQuestion.objects.filter(id__in=writing_ids)
-
+        
+        # answers['writing'] = [{"question_id": 7, "text_answer": "My answer..."}]
+        writing_answers = {
+            str(ans['question_id']): ans.get('text_answer', '')
+            for ans in answers.get('writing', [])
+            if 'question_id' in ans
+        }
+        
         for wq in writing_questions:
             max_score += wq.points
-            answer_key = f"writing_{wq.id}"
-            student_answer = answers.get(answer_key, '')
+            student_answer = writing_answers.get(str(wq.id), '')
             
             if student_answer:
                 try:
-                    # ✅ استخدام AI Grading Service
                     logger.info(f"Grading writing question {wq.id} for Unit Exam")
                     
                     ai_result = ai_grading_service.grade_writing_question(
@@ -2834,7 +2814,6 @@ def submit_unit_exam(request, attempt_id):
                         pass_threshold=wq.pass_threshold
                     )
                     
-                    # ✅ إضافة النقطة (Binary: 0 or 1)
                     total_score += ai_result['score']
                     
                     logger.info(
@@ -2846,8 +2825,6 @@ def submit_unit_exam(request, attempt_id):
                     
                 except Exception as e:
                     logger.error(f"AI Grading Error for Writing Q{wq.id}: {str(e)}")
-                    
-                    # ⚠️ Fallback: استخدام word count check بسيط
                     word_count = len(student_answer.split())
                     if wq.min_words <= word_count <= wq.max_words:
                         total_score += 1
@@ -2855,19 +2832,14 @@ def submit_unit_exam(request, attempt_id):
                     else:
                         logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=0")
         
-        # حساب النسبة المئوية
         percentage = (total_score / max_score * 100) if max_score > 0 else 0
-        
-        # تحديد النجاح/الرسوب
         passed = percentage >= attempt.unit_exam.passing_score
         
-        # حفظ النتيجة
         attempt.score = int(percentage)
         attempt.passed = passed
         attempt.submitted_at = timezone.now()
         attempt.save()
         
-        # تحديث StudentUnit إذا نجح
         if passed:
             student_unit = StudentUnit.objects.get(
                 student=request.user,
@@ -2878,17 +2850,12 @@ def submit_unit_exam(request, attempt_id):
             student_unit.completed_at = timezone.now()
             student_unit.save()
             
-            # التحقق من إكمال جميع وحدات المستوى
             total_units = attempt.unit_exam.unit.level.get_units_count()
             completed_units = StudentUnit.objects.filter(
                 student=request.user,
                 unit__level=attempt.unit_exam.unit.level,
                 status='COMPLETED'
             ).count()
-            
-            # إذا أكمل جميع الوحدات، يمكنه دخول امتحان المستوى
-            if completed_units >= total_units:
-                pass  # يمكن إضافة notification هنا
     
     serializer = StudentUnitExamAttemptSerializer(attempt)
     
@@ -3048,22 +3015,9 @@ def start_level_exam(request, level_id):
         }
     }, status=status.HTTP_201_CREATED)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_level_exam(request, attempt_id):
-    """
-    تسليم امتحان المستوى
-    
-    POST /api/levels/student/exams/level/submit/{attempt_id}/
-    
-    Body: Same as unit exam
-    
-    ✅ Grades MCQ automatically
-    ✅ Sends Writing to AI for grading
-    ✅ Calculates final score
-    ✅ Updates StudentLevel if passed
-    """
     attempt = get_object_or_404(
         StudentLevelExamAttempt,
         id=attempt_id,
@@ -3077,7 +3031,6 @@ def submit_level_exam(request, attempt_id):
             'passed': attempt.passed
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # التحقق من البيانات
     answers = request.data.get('answers', {})
     
     if not answers:
@@ -3086,56 +3039,59 @@ def submit_level_exam(request, attempt_id):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     with transaction.atomic():
-        # حفظ الإجابات
         attempt.answers = answers
         
-        # حساب الوقت المستغرق
         time_taken = (timezone.now() - attempt.started_at).total_seconds()
         attempt.time_taken = int(time_taken)
         
-        # تصحيح الأسئلة (نفس المنطق من unit exam)
         total_score = 0
         max_score = 0
         
         generated_questions = attempt.generated_questions
         
-        # تصحيح MCQ Questions
-        mcq_types = ['vocabulary', 'grammar', 'reading', 'listening', 'speaking']
+        # ✅ تصحيح MCQ - النظام الجديد (arrays)
+        mcq_config = {
+            'vocabulary': VocabularyQuestion,
+            'grammar': GrammarQuestion,
+            'reading': ReadingQuestion,
+            'listening': ListeningQuestion,
+            'speaking': SpeakingQuestion,
+        }
         
-        for q_type in mcq_types:
+        for q_type, QuestionModel in mcq_config.items():
             question_ids = generated_questions.get(q_type, [])
+            questions = QuestionModel.objects.filter(id__in=question_ids)
             
-            if q_type == 'vocabulary':
-                questions = VocabularyQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'grammar':
-                questions = GrammarQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'reading':
-                questions = ReadingQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'listening':
-                questions = ListeningQuestion.objects.filter(id__in=question_ids)
-            elif q_type == 'speaking':
-                questions = SpeakingQuestion.objects.filter(id__in=question_ids)
+            # ✅ تحويل الـ array لـ dict للبحث السريع
+            type_answers = {
+                str(ans['question_id']): ans['selected_choice']
+                for ans in answers.get(q_type, [])
+                if 'question_id' in ans and 'selected_choice' in ans
+            }
             
             for q in questions:
                 max_score += q.points
-                answer_key = f"{q_type}_{q.id}"
-                student_answer = answers.get(answer_key)
+                student_answer = type_answers.get(str(q.id))
                 
                 if student_answer == q.correct_answer:
                     total_score += q.points
         
-        # تصحيح Writing Questions (AI Grading)
+        # ✅ تصحيح Writing - النظام الجديد
         writing_ids = generated_questions.get('writing', [])
         writing_questions = WritingQuestion.objects.filter(id__in=writing_ids)
-
+        
+        writing_answers = {
+            str(ans['question_id']): ans.get('text_answer', '')
+            for ans in answers.get('writing', [])
+            if 'question_id' in ans
+        }
+        
         for wq in writing_questions:
             max_score += wq.points
-            answer_key = f"writing_{wq.id}"
-            student_answer = answers.get(answer_key, '')
+            student_answer = writing_answers.get(str(wq.id), '')
             
             if student_answer:
                 try:
-                    # ✅ استخدام AI Grading Service
                     logger.info(f"Grading writing question {wq.id} for Level Exam")
                     
                     ai_result = ai_grading_service.grade_writing_question(
@@ -3149,7 +3105,6 @@ def submit_level_exam(request, attempt_id):
                         pass_threshold=wq.pass_threshold
                     )
                     
-                    # ✅ إضافة النقطة (Binary: 0 or 1)
                     total_score += ai_result['score']
                     
                     logger.info(
@@ -3161,29 +3116,21 @@ def submit_level_exam(request, attempt_id):
                     
                 except Exception as e:
                     logger.error(f"AI Grading Error for Writing Q{wq.id}: {str(e)}")
-                    
-                    # ⚠️ Fallback: استخدام word count check بسيط
                     word_count = len(student_answer.split())
                     if wq.min_words <= word_count <= wq.max_words:
                         total_score += 1
                         logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=1")
                     else:
                         logger.warning(f"Used fallback grading for Q{wq.id}: word_count={word_count}, score=0")
-
         
-        # حساب النسبة المئوية
         percentage = (total_score / max_score * 100) if max_score > 0 else 0
-        
-        # تحديد النجاح/الرسوب
         passed = percentage >= attempt.level_exam.passing_score
         
-        # حفظ النتيجة
         attempt.score = int(percentage)
         attempt.passed = passed
         attempt.submitted_at = timezone.now()
         attempt.save()
         
-        # تحديث StudentLevel إذا نجح
         if passed:
             student_level = StudentLevel.objects.get(
                 student=request.user,
@@ -3209,7 +3156,6 @@ def submit_level_exam(request, attempt_id):
         'level_status': 'COMPLETED' if passed else 'FAILED',
         'congratulations': '🎉 تهانينا! لقد أكملت المستوى بنجاح!' if passed else None
     }, status=status.HTTP_200_OK)
-
 
 # ============================================
 # 12. EXAM RESULTS & HISTORY
