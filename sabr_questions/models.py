@@ -92,6 +92,7 @@ class UsageTypeMixin(models.Model):
         ('LESSON', 'Lesson Content'),        # 🆕 للأسئلة المحلولة في الدروس
         ('UNIT_EXAM', 'Unit Exam'),          # 🆕 امتحان الوحدة
         ('LEVEL_EXAM', 'Level Exam'),        # 🆕 امتحان المستوى
+        ('IELTS', 'IELTS Exam'),             # 🆕 امتحان IELTS
         ('GENERAL', 'General Use'),
     ]
     
@@ -147,8 +148,30 @@ class UsageTypeMixin(models.Model):
         help_text="لأسئلة امتحان المستوى (usage_type=LEVEL_EXAM)"
     )
     
+    # 🆕 NEW: Foreign Key للـ IELTS System
+    ielts_lesson_pack = models.ForeignKey(
+        'ielts.LessonPack',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="IELTS Lesson Pack",
+        help_text="لأسئلة امتحان IELTS (usage_type=IELTS)"
+    )
+    step_skill = models.ForeignKey(
+        'step.STEPSkill',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="STEP Skill",
+        help_text="لأسئلة STEP (usage_type=STEP)"
+    )
+    
     class Meta:
         abstract = True
+
+    
 
 
 # ============================================
@@ -618,10 +641,10 @@ class WritingQuestion(TimeStampedModel, OrderedModel, UsageTypeMixin):
     )
     
     points = models.PositiveIntegerField(
-        default=1,  # ← تغيير من 10 إلى 1
+        default=1,
         validators=[MinValueValidator(1)],
         verbose_name="النقاط",
-        editable=False  # ← منع التعديل (ثابتة على 1)
+        editable=False
     )
     
     # ✅ إضافة: نسبة النجاح (Pass Threshold)

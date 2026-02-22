@@ -45,6 +45,9 @@ INSTALLED_APPS = [
     'cloudinary',
     'placement_test',
     'levels',
+    'ielts',
+    'step',
+
 ]
 
 AUTH_USER_MODEL = 'sabr_auth.User'

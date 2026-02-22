@@ -8,6 +8,10 @@ urlpatterns = [
     path('questions/', include('sabr_questions.urls')),
     path('place/', include('placement_test.urls')),
     path('levels/', include('levels.urls')),
+    path('ielts/', include('ielts.urls')),
+    path('step/', include('step.urls')),
+
+
 
 
 
