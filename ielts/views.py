@@ -573,15 +573,9 @@ def mark_lesson_pack_complete(request, pack_id):
 # ============================================
 # 5. EXAM ATTEMPTS
 # ============================================
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def start_practice_exam(request, pack_id):
-    """
-    بدء Practice Exam
-    
-    POST /api/ielts/student/practice-exams/start/{pack_id}/
-    """
     lesson_pack = get_object_or_404(LessonPack, id=pack_id)
     practice_exam = lesson_pack.get_practice_exam()
     
@@ -599,12 +593,89 @@ def start_practice_exam(request, pack_id):
     
     attempt_number = (last_attempt.attempt_number + 1) if last_attempt else 1
     
-    # إنشاء المحاولة
     attempt = StudentPracticeExamAttempt.objects.create(
         student=request.user,
         practice_exam=practice_exam,
         attempt_number=attempt_number
     )
+    
+    # ============================================
+    # جيب كل الأسئلة
+    # ============================================
+    from sabr_questions.models import (
+        VocabularyQuestion, GrammarQuestion,
+        ReadingPassage, ListeningAudio,
+        SpeakingVideo, WritingQuestion
+    )
+    
+    # Vocabulary Questions
+    vocabulary_questions = VocabularyQuestion.objects.filter(
+        ielts_lesson_pack=lesson_pack,
+        usage_type='IELTS',
+        is_active=True
+    ).values('id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points')
+    
+    # Grammar Questions
+    grammar_questions = GrammarQuestion.objects.filter(
+        ielts_lesson_pack=lesson_pack,
+        usage_type='IELTS',
+        is_active=True
+    ).values('id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points')
+    
+    # Reading Passages + Questions
+    reading_passages = []
+    for passage in ReadingPassage.objects.filter(
+        ielts_lesson_pack=lesson_pack,
+        usage_type='IELTS',
+        is_active=True
+    ).prefetch_related('questions'):
+        reading_passages.append({
+            'id': passage.id,
+            'title': passage.title,
+            'passage_text': passage.passage_text,
+            'questions': list(passage.questions.filter(is_active=True).values(
+                'id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points'
+            ))
+        })
+    
+    # Listening Audios + Questions
+    listening_audios = []
+    for audio in ListeningAudio.objects.filter(
+        ielts_lesson_pack=lesson_pack,
+        usage_type='IELTS',
+        is_active=True
+    ).prefetch_related('questions'):
+        listening_audios.append({
+            'id': audio.id,
+            'title': audio.title,
+            'audio_file': audio.audio_file,
+            'questions': list(audio.questions.filter(is_active=True).values(
+                'id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points'
+            ))
+        })
+    
+    # Speaking Videos + Questions
+    speaking_videos = []
+    for video in SpeakingVideo.objects.filter(
+        ielts_lesson_pack=lesson_pack,
+        usage_type='IELTS',
+        is_active=True
+    ).prefetch_related('questions'):
+        speaking_videos.append({
+            'id': video.id,
+            'title': video.title,
+            'video_file': video.video_file,
+            'questions': list(video.questions.filter(is_active=True).values(
+                'id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points'
+            ))
+        })
+    
+    # Writing Questions
+    writing_questions = WritingQuestion.objects.filter(
+        ielts_lesson_pack=lesson_pack,
+        usage_type='IELTS',
+        is_active=True
+    ).values('id', 'title', 'question_text', 'min_words', 'max_words', 'points')
     
     serializer = StudentPracticeExamAttemptSerializer(attempt)
     
@@ -615,9 +686,19 @@ def start_practice_exam(request, pack_id):
             'time_limit': lesson_pack.exam_time_limit,
             'passing_score': lesson_pack.exam_passing_score,
             'total_questions': practice_exam.get_questions_count()
+        },
+        # ============================================
+        # الأسئلة
+        # ============================================
+        'questions': {
+            'vocabulary': list(vocabulary_questions),
+            'grammar': list(grammar_questions),
+            'reading': reading_passages,
+            'listening': listening_audios,
+            'speaking': speaking_videos,
+            'writing': list(writing_questions),
         }
     }, status=status.HTTP_201_CREATED)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
