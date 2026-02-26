@@ -3242,3 +3242,287 @@ def my_level_exam_attempts(request):
         },
         'attempts': serializer.data
     }, status=status.HTTP_200_OK)
+
+# ============================================
+# COMBINED LESSON DETAIL ENDPOINTS
+# أضف الكود ده في نهاية views.py
+# ============================================
+
+from placement_test.serializers import (
+    ReadingQuestionSerializer,
+    ListeningQuestionSerializer,
+    SpeakingQuestionSerializer,
+)
+
+# ============================================
+# READING - Lesson + Content + Questions
+# GET /levels/lesson-detail/reading/<lesson_id>/
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_reading_lesson_full(request, lesson_id):
+    """
+    عرض الدرس + محتوى القراءة + الأسئلة كلها في response واحد
+
+    GET /api/levels/lesson-detail/reading/{lesson_id}/
+
+    Response:
+    {
+        "lesson": { id, title, lesson_type, order, is_active, unit_details },
+        "content": {
+            "explanation": "...",
+            "vocabulary_words": [...],
+            "passage": {
+                "id", "title", "passage_text", "passage_image", "source"
+            }
+        },
+        "questions": [
+            {
+                "id", "question_text", "question_image",
+                "choice_a", "choice_b", "choice_c", "choice_d",
+                "correct_answer", "explanation", "points", "order"
+            }
+        ],
+        "questions_count": 5
+    }
+    """
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.lesson_type != 'READING':
+        return Response({
+            'error': 'هذا الدرس ليس من نوع READING'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    lesson_data = LessonDetailSerializer(lesson).data
+
+    # المحتوى
+    reading_content = getattr(lesson, 'reading_content', None)
+    if not reading_content:
+        return Response({
+            'lesson': lesson_data,
+            'content': None,
+            'questions': [],
+            'questions_count': 0
+        }, status=status.HTTP_200_OK)
+
+    content_data = {
+        'explanation': reading_content.explanation,
+        'vocabulary_words': reading_content.vocabulary_words,
+        'passage': {
+            'id': reading_content.passage.id,
+            'title': reading_content.passage.title,
+            'passage_text': reading_content.passage.passage_text,
+            'passage_image': reading_content.passage.passage_image.url if reading_content.passage.passage_image else None,
+            'source': reading_content.passage.source,
+        }
+    }
+
+    # الأسئلة
+    questions = ReadingQuestion.objects.filter(
+        passage=reading_content.passage,
+        is_active=True
+    ).order_by('order', 'id')
+
+    questions_data = ReadingQuestionSerializer(questions, many=True).data
+
+    return Response({
+        'lesson': lesson_data,
+        'content': content_data,
+        'questions': questions_data,
+        'questions_count': questions.count()
+    }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# LISTENING - Lesson + Content + Questions
+# GET /levels/lesson-detail/listening/<lesson_id>/
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_listening_lesson_full(request, lesson_id):
+    """
+    عرض الدرس + محتوى الاستماع + الأسئلة كلها في response واحد
+
+    GET /api/levels/lesson-detail/listening/{lesson_id}/
+
+    Response:
+    {
+        "lesson": { ... },
+        "content": {
+            "explanation": "...",
+            "audio": {
+                "id", "title", "audio_file", "transcript", "duration"
+            }
+        },
+        "questions": [ { ... } ],
+        "questions_count": 3
+    }
+    """
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.lesson_type != 'LISTENING':
+        return Response({
+            'error': 'هذا الدرس ليس من نوع LISTENING'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    lesson_data = LessonDetailSerializer(lesson).data
+
+    listening_content = getattr(lesson, 'listening_content', None)
+    if not listening_content:
+        return Response({
+            'lesson': lesson_data,
+            'content': None,
+            'questions': [],
+            'questions_count': 0
+        }, status=status.HTTP_200_OK)
+
+    content_data = {
+        'explanation': listening_content.explanation,
+        'audio': {
+            'id': listening_content.audio.id,
+            'title': listening_content.audio.title,
+            'audio_file': listening_content.audio.audio_file.url if listening_content.audio.audio_file else None,
+            'transcript': listening_content.audio.transcript,
+            'duration': listening_content.audio.duration,
+        }
+    }
+
+    questions = ListeningQuestion.objects.filter(
+        audio=listening_content.audio,
+        is_active=True
+    ).order_by('order', 'id')
+
+    questions_data = ListeningQuestionSerializer(questions, many=True).data
+
+    return Response({
+        'lesson': lesson_data,
+        'content': content_data,
+        'questions': questions_data,
+        'questions_count': questions.count()
+    }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# SPEAKING - Lesson + Content + Questions
+# GET /levels/lesson-detail/speaking/<lesson_id>/
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_speaking_lesson_full(request, lesson_id):
+    """
+    عرض الدرس + محتوى التحدث + الأسئلة كلها في response واحد
+
+    GET /api/levels/lesson-detail/speaking/{lesson_id}/
+
+    Response:
+    {
+        "lesson": { ... },
+        "content": {
+            "explanation": "...",
+            "video": {
+                "id", "title", "video_file", "thumbnail", "description", "duration"
+            }
+        },
+        "questions": [ { ... } ],
+        "questions_count": 3
+    }
+    """
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.lesson_type != 'SPEAKING':
+        return Response({
+            'error': 'هذا الدرس ليس من نوع SPEAKING'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    lesson_data = LessonDetailSerializer(lesson).data
+
+    speaking_content = getattr(lesson, 'speaking_content', None)
+    if not speaking_content:
+        return Response({
+            'lesson': lesson_data,
+            'content': None,
+            'questions': [],
+            'questions_count': 0
+        }, status=status.HTTP_200_OK)
+
+    content_data = {
+        'explanation': speaking_content.explanation,
+        'video': {
+            'id': speaking_content.video.id,
+            'title': speaking_content.video.title,
+            'video_file': speaking_content.video.video_file.url if speaking_content.video.video_file else None,
+            'thumbnail': speaking_content.video.thumbnail.url if speaking_content.video.thumbnail else None,
+            'description': speaking_content.video.description,
+            'duration': speaking_content.video.duration,
+        }
+    }
+
+    questions = SpeakingQuestion.objects.filter(
+        video=speaking_content.video,
+        is_active=True
+    ).order_by('order', 'id')
+
+    questions_data = SpeakingQuestionSerializer(questions, many=True).data
+
+    return Response({
+        'lesson': lesson_data,
+        'content': content_data,
+        'questions': questions_data,
+        'questions_count': questions.count()
+    }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# WRITING - Lesson + Content (لا يوجد أسئلة MCQ)
+# GET /levels/lesson-detail/writing/<lesson_id>/
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_writing_lesson_full(request, lesson_id):
+    """
+    عرض الدرس + محتوى الكتابة في response واحد
+
+    GET /api/levels/lesson-detail/writing/{lesson_id}/
+
+    Response:
+    {
+        "lesson": { ... },
+        "content": {
+            "title": "...",
+            "writing_passage": "...",
+            "instructions": "...",
+            "sample_answer": "..."
+        }
+    }
+    """
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.lesson_type != 'WRITING':
+        return Response({
+            'error': 'هذا الدرس ليس من نوع WRITING'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    lesson_data = LessonDetailSerializer(lesson).data
+
+    writing_content = getattr(lesson, 'writing_content', None)
+    if not writing_content:
+        return Response({
+            'lesson': lesson_data,
+            'content': None,
+        }, status=status.HTTP_200_OK)
+
+    content_data = {
+        'title': writing_content.title,
+        'writing_passage': writing_content.writing_passage,
+        'instructions': writing_content.instructions,
+        'sample_answer': writing_content.sample_answer,
+    }
+
+    return Response({
+        'lesson': lesson_data,
+        'content': content_data,
+    }, status=status.HTTP_200_OK)

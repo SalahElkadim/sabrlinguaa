@@ -64,7 +64,16 @@ urlpatterns = [
     # 5. EXAM URLS
     # ============================================
     
-    
+    # ============================================
+# أضف الـ URLs دي في urls.py بتاع levels
+# في نهاية الـ urlpatterns
+# ============================================
+
+# Combined Lesson Detail (Lesson + Content + Questions)
+    path('lesson-detail/reading/<int:lesson_id>/',  views.get_reading_lesson_full,  name='get_reading_lesson_full'),
+    path('lesson-detail/listening/<int:lesson_id>/', views.get_listening_lesson_full, name='get_listening_lesson_full'),
+    path('lesson-detail/speaking/<int:lesson_id>/',  views.get_speaking_lesson_full,  name='get_speaking_lesson_full'),
+    path('lesson-detail/writing/<int:lesson_id>/',   views.get_writing_lesson_full,   name='get_writing_lesson_full'),
     # ============================================
     # 6. QUESTION BANK URLS
     # ============================================
