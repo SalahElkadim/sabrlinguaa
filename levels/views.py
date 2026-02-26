@@ -2046,17 +2046,9 @@ def start_level(request, level_id):
         }
     }, status=status.HTTP_201_CREATED)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def start_unit(request, unit_id):
-    """
-    بدء وحدة جديدة
-    
-    POST /api/levels/student/start-unit/{unit_id}/
-    
-    ✅ Auto-creates StudentUnit (status='IN_PROGRESS')
-    """
     unit = get_object_or_404(Unit, id=unit_id, is_active=True)
     
     # التحقق من أن الطالب في المستوى الصحيح
@@ -2070,6 +2062,30 @@ def start_unit(request, unit_id):
         return Response({
             'error': 'يجب أن تبدأ المستوى أولاً'
         }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # ✅ CHECK الجديد - التحقق من إكمال الوحدة السابقة
+    if unit.order > 1:
+        previous_unit = Unit.objects.filter(
+            level=unit.level,
+            order=unit.order - 1,
+            is_active=True
+        ).first()
+        
+        if previous_unit:
+            previous_student_unit = StudentUnit.objects.filter(
+                student=request.user,
+                unit=previous_unit,
+            ).first()
+            
+            if not previous_student_unit or previous_student_unit.status != 'COMPLETED':
+                return Response({
+                    'error': 'يجب إكمال الوحدة السابقة أولاً',
+                    'previous_unit': {
+                        'id': previous_unit.id,
+                        'title': previous_unit.title,
+                        'status': previous_student_unit.status if previous_student_unit else 'NOT_STARTED'
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
     
     # التحقق من عدم وجود وحدة نشطة
     existing = StudentUnit.objects.filter(
@@ -2090,7 +2106,6 @@ def start_unit(request, unit_id):
             }, status=status.HTTP_400_BAD_REQUEST)
     
     with transaction.atomic():
-        # إنشاء StudentUnit
         student_unit = StudentUnit.objects.create(
             student=request.user,
             unit=unit,
@@ -2098,7 +2113,6 @@ def start_unit(request, unit_id):
             started_at=timezone.now()
         )
         
-        # تحديث current_unit في StudentLevel
         student_level.current_unit = unit
         student_level.save()
     
