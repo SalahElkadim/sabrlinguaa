@@ -771,9 +771,14 @@ def submit_practice_exam(request, attempt_id):
     
     Body:
     {
-        "answers": {...},
-        "score": 85,
-        "passed": true
+        "answers": {
+            "vocabulary": {"63": "A", "64": "B"},
+            "grammar":    {"61": "A", "62": "C"},
+            "reading":    {"86": "A", "89": "B"},   ← question IDs مباشرة
+            "listening":  {"49": "A"},               ← question IDs مباشرة
+            "speaking":   {},
+            "writing":    {"26": "My essay text..."}
+        }
     }
     """
     attempt = get_object_or_404(
@@ -788,19 +793,195 @@ def submit_practice_exam(request, attempt_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # تحديث البيانات
-    attempt.answers = request.data.get('answers', {})
-    attempt.score = request.data.get('score')
-    attempt.passed = request.data.get('passed', False)
+    from sabr_questions.models import (
+        VocabularyQuestion, GrammarQuestion,
+        ReadingQuestion, ListeningQuestion,
+        SpeakingQuestion, WritingQuestion
+    )
+    from placement_test.services.ai_grading import ai_grading_service
+    
+    answers = request.data.get('answers', {})
+    
+    # التحقق من وجود answers
+    if not answers:
+        return Response(
+            {'error': 'يجب إرسال الإجابات'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    lesson_pack = attempt.practice_exam.lesson_pack
+    total_points = 0
+    earned_points = 0
+    results = {}
+    
+    # ============================================
+    # Helper لتصحيح MCQ
+    # ============================================
+    def grade_mcq(model, answer_dict, result_key):
+        nonlocal total_points, earned_points
+        
+        question_results = []
+        
+        for q_id_str, student_answer in answer_dict.items():
+            try:
+                question = model.objects.get(id=int(q_id_str))
+                is_correct = question.correct_answer == student_answer.upper()
+                
+                total_points += question.points
+                if is_correct:
+                    earned_points += question.points
+                
+                question_results.append({
+                    'question_id': question.id,
+                    'student_answer': student_answer.upper(),
+                    'correct_answer': question.correct_answer,
+                    'is_correct': is_correct,
+                    'points_earned': question.points if is_correct else 0,
+                    'points_possible': question.points,
+                })
+            except (model.DoesNotExist, ValueError):
+                continue
+        
+        results[result_key] = question_results
+    
+    # ============================================
+    # تصحيح MCQ
+    # ============================================
+    grade_mcq(VocabularyQuestion, answers.get('vocabulary', {}), 'vocabulary')
+    grade_mcq(GrammarQuestion,    answers.get('grammar', {}),    'grammar')
+    grade_mcq(ReadingQuestion,    answers.get('reading', {}),    'reading')
+    grade_mcq(ListeningQuestion,  answers.get('listening', {}),  'listening')
+    grade_mcq(SpeakingQuestion,   answers.get('speaking', {}),   'speaking')
+    
+    # ============================================
+    # تصحيح Writing بالـ AI
+    # ============================================
+    writing_results = []
+    total_ai_cost = 0.0
+    
+    for q_id_str, student_text in answers.get('writing', {}).items():
+        try:
+            writing_question = WritingQuestion.objects.get(id=int(q_id_str))
+            
+            # التحقق من أن الإجابة مش فاضية
+            if not student_text or not student_text.strip():
+                writing_results.append({
+                    'question_id': int(q_id_str),
+                    'student_answer': '',
+                    'score': 0,
+                    'raw_score': 0,
+                    'percentage': 0,
+                    'is_correct': False,
+                    'word_count': 0,
+                    'is_within_limit': False,
+                    'feedback': 'لم يتم تقديم إجابة',
+                    'strengths': [],
+                    'improvements': ['يجب كتابة إجابة'],
+                    'points_possible': writing_question.points,
+                })
+                total_points += writing_question.points
+                continue
+            
+            logger.info(f"AI grading writing Q:{q_id_str} for IELTS attempt:{attempt_id}")
+            
+            grading_result = ai_grading_service.grade_writing_question(
+                question_text=writing_question.question_text,
+                student_answer=student_text,
+                sample_answer=writing_question.sample_answer or '',
+                rubric=writing_question.rubric or '',
+                max_points=writing_question.points,
+                min_words=writing_question.min_words,
+                max_words=writing_question.max_words,
+                pass_threshold=writing_question.pass_threshold
+            )
+            
+            total_points += writing_question.points
+            if grading_result['is_correct']:
+                earned_points += grading_result['score']  # 0 or 1
+            
+            total_ai_cost += grading_result.get('cost', 0.0)
+            
+            writing_results.append({
+                'question_id': int(q_id_str),
+                'student_answer': student_text,
+                'score': grading_result['score'],             # 0 or 1
+                'raw_score': grading_result.get('raw_score', 0),
+                'percentage': grading_result.get('percentage', 0),
+                'is_correct': grading_result['is_correct'],
+                'word_count': grading_result['word_count'],
+                'is_within_limit': grading_result['is_within_limit'],
+                'feedback': grading_result['feedback'],
+                'strengths': grading_result['strengths'],
+                'improvements': grading_result['improvements'],
+                'points_possible': writing_question.points,
+                'pass_threshold': writing_question.pass_threshold,
+            })
+            
+        except WritingQuestion.DoesNotExist:
+            continue
+        except Exception as e:
+            logger.error(f"Error grading writing Q:{q_id_str} attempt:{attempt_id} - {str(e)}")
+            writing_results.append({
+                'question_id': int(q_id_str),
+                'student_answer': student_text,
+                'score': 0,
+                'is_correct': False,
+                'feedback': 'حدث خطأ أثناء التصحيح، سيتم المراجعة يدوياً',
+                'status': 'error',
+            })
+    
+    results['writing'] = writing_results
+    
+    # ============================================
+    # حساب النتيجة النهائية
+    # ============================================
+    score_percentage = round(
+        (earned_points / total_points * 100), 2
+    ) if total_points > 0 else 0
+    
+    passing_score = lesson_pack.exam_passing_score or 70
+    passed = score_percentage >= passing_score
+    
+    # حفظ النتيجة
+    attempt.answers = answers
+    attempt.score = score_percentage
+    attempt.passed = passed
     attempt.mark_submitted()
     
-    serializer = StudentPracticeExamAttemptSerializer(attempt)
+    # ============================================
+    # إحصائيات سريعة
+    # ============================================
+    def count_stats(result_list):
+        correct = sum(1 for r in result_list if r.get('is_correct'))
+        return {'correct': correct, 'total': len(result_list)}
     
     return Response({
         'message': 'تم تسليم الامتحان بنجاح',
-        'result': serializer.data
+        'result': {
+            'attempt_id': attempt.id,
+            'attempt_number': attempt.attempt_number,
+            'score': score_percentage,
+            'passed': passed,
+            'passing_score': passing_score,
+            'points': {
+                'earned': earned_points,
+                'total': total_points,
+            },
+            'submitted_at': attempt.submitted_at,
+            'ai_grading_cost': round(total_ai_cost, 6),
+            # إحصائيات سريعة لكل section
+            'summary': {
+                'vocabulary': count_stats(results.get('vocabulary', [])),
+                'grammar':    count_stats(results.get('grammar', [])),
+                'reading':    count_stats(results.get('reading', [])),
+                'listening':  count_stats(results.get('listening', [])),
+                'speaking':   count_stats(results.get('speaking', [])),
+                'writing':    count_stats(results.get('writing', [])),
+            },
+            # تفصيل كل سؤال
+            'breakdown': results,
+        }
     }, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
