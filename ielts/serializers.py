@@ -597,3 +597,11 @@ class StudentPracticeExamAttemptCreateSerializer(serializers.ModelSerializer):
             )
         
         return data
+
+def serialize_cloudinary(value):
+    """تحويل CloudinaryResource لـ string"""
+    if value is None:
+        return None
+    if hasattr(value, 'url'):
+        return value.url
+    return str(value) if value else None

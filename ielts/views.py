@@ -585,7 +585,6 @@ def start_practice_exam(request, pack_id):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # حساب رقم المحاولة
     last_attempt = StudentPracticeExamAttempt.objects.filter(
         student=request.user,
         practice_exam=practice_exam
@@ -599,28 +598,55 @@ def start_practice_exam(request, pack_id):
         attempt_number=attempt_number
     )
     
-    # ============================================
-    # جيب كل الأسئلة
-    # ============================================
     from sabr_questions.models import (
         VocabularyQuestion, GrammarQuestion,
         ReadingPassage, ListeningAudio,
         SpeakingVideo, WritingQuestion
     )
     
+    # ============================================
+    # Helper لتحويل CloudinaryResource
+    # ============================================
+    def serialize_cloudinary(value):
+        if value is None:
+            return None
+        if hasattr(value, 'url'):
+            return value.url
+        return str(value) if value else None
+    
     # Vocabulary Questions
-    vocabulary_questions = VocabularyQuestion.objects.filter(
+    vocabulary_questions = []
+    for q in VocabularyQuestion.objects.filter(
         ielts_lesson_pack=lesson_pack,
         usage_type='IELTS',
         is_active=True
-    ).values('id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points')
+    ):
+        vocabulary_questions.append({
+            'id': q.id,
+            'question_text': q.question_text,
+            'choice_a': q.choice_a,
+            'choice_b': q.choice_b,
+            'choice_c': q.choice_c,
+            'choice_d': q.choice_d,
+            'points': q.points,
+        })
     
     # Grammar Questions
-    grammar_questions = GrammarQuestion.objects.filter(
+    grammar_questions = []
+    for q in GrammarQuestion.objects.filter(
         ielts_lesson_pack=lesson_pack,
         usage_type='IELTS',
         is_active=True
-    ).values('id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points')
+    ):
+        grammar_questions.append({
+            'id': q.id,
+            'question_text': q.question_text,
+            'choice_a': q.choice_a,
+            'choice_b': q.choice_b,
+            'choice_c': q.choice_c,
+            'choice_d': q.choice_d,
+            'points': q.points,
+        })
     
     # Reading Passages + Questions
     reading_passages = []
@@ -629,13 +655,22 @@ def start_practice_exam(request, pack_id):
         usage_type='IELTS',
         is_active=True
     ).prefetch_related('questions'):
+        questions = []
+        for q in passage.questions.filter(is_active=True):
+            questions.append({
+                'id': q.id,
+                'question_text': q.question_text,
+                'choice_a': q.choice_a,
+                'choice_b': q.choice_b,
+                'choice_c': q.choice_c,
+                'choice_d': q.choice_d,
+                'points': q.points,
+            })
         reading_passages.append({
             'id': passage.id,
             'title': passage.title,
             'passage_text': passage.passage_text,
-            'questions': list(passage.questions.filter(is_active=True).values(
-                'id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points'
-            ))
+            'questions': questions,
         })
     
     # Listening Audios + Questions
@@ -645,13 +680,22 @@ def start_practice_exam(request, pack_id):
         usage_type='IELTS',
         is_active=True
     ).prefetch_related('questions'):
+        questions = []
+        for q in audio.questions.filter(is_active=True):
+            questions.append({
+                'id': q.id,
+                'question_text': q.question_text,
+                'choice_a': q.choice_a,
+                'choice_b': q.choice_b,
+                'choice_c': q.choice_c,
+                'choice_d': q.choice_d,
+                'points': q.points,
+            })
         listening_audios.append({
             'id': audio.id,
             'title': audio.title,
-            'audio_file': audio.audio_file,
-            'questions': list(audio.questions.filter(is_active=True).values(
-                'id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points'
-            ))
+            'audio_file': serialize_cloudinary(audio.audio_file),  # ✅ هنا الحل
+            'questions': questions,
         })
     
     # Speaking Videos + Questions
@@ -661,21 +705,41 @@ def start_practice_exam(request, pack_id):
         usage_type='IELTS',
         is_active=True
     ).prefetch_related('questions'):
+        questions = []
+        for q in video.questions.filter(is_active=True):
+            questions.append({
+                'id': q.id,
+                'question_text': q.question_text,
+                'choice_a': q.choice_a,
+                'choice_b': q.choice_b,
+                'choice_c': q.choice_c,
+                'choice_d': q.choice_d,
+                'points': q.points,
+            })
         speaking_videos.append({
             'id': video.id,
             'title': video.title,
-            'video_file': video.video_file,
-            'questions': list(video.questions.filter(is_active=True).values(
-                'id', 'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 'points'
-            ))
+            'video_file': serialize_cloudinary(video.video_file),      # ✅ هنا الحل
+            'thumbnail': serialize_cloudinary(video.thumbnail),        # ✅ هنا الحل
+            'questions': questions,
         })
     
     # Writing Questions
-    writing_questions = WritingQuestion.objects.filter(
+    writing_questions = []
+    for q in WritingQuestion.objects.filter(
         ielts_lesson_pack=lesson_pack,
         usage_type='IELTS',
         is_active=True
-    ).values('id', 'title', 'question_text', 'min_words', 'max_words', 'points')
+    ):
+        writing_questions.append({
+            'id': q.id,
+            'title': q.title,
+            'question_text': q.question_text,
+            'question_image': serialize_cloudinary(q.question_image),  # ✅ هنا الحل
+            'min_words': q.min_words,
+            'max_words': q.max_words,
+            'points': q.points,
+        })
     
     serializer = StudentPracticeExamAttemptSerializer(attempt)
     
@@ -687,16 +751,13 @@ def start_practice_exam(request, pack_id):
             'passing_score': lesson_pack.exam_passing_score,
             'total_questions': practice_exam.get_questions_count()
         },
-        # ============================================
-        # الأسئلة
-        # ============================================
         'questions': {
-            'vocabulary': list(vocabulary_questions),
-            'grammar': list(grammar_questions),
+            'vocabulary': vocabulary_questions,
+            'grammar': grammar_questions,
             'reading': reading_passages,
             'listening': listening_audios,
             'speaking': speaking_videos,
-            'writing': list(writing_questions),
+            'writing': writing_questions,
         }
     }, status=status.HTTP_201_CREATED)
 
