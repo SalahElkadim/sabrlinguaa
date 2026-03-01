@@ -13,7 +13,7 @@ urlpatterns = [
     path('skills/<int:skill_id>/update/', views.update_skill, name='update-skill'),
     path('skills/<int:skill_id>/delete/', views.delete_skill, name='delete-skill'),
     path('skills/<int:skill_id>/lesson-packs/', views.get_skill_lesson_packs, name='get-skill-lesson-packs'),
-    
+
     # ============================================
     # 2. LESSON PACKS
     # ============================================
@@ -24,7 +24,7 @@ urlpatterns = [
     path('lesson-packs/<int:pack_id>/delete/', views.delete_lesson_pack, name='delete-lesson-pack'),
     path('lesson-packs/<int:pack_id>/lessons/', views.get_lesson_pack_lessons, name='get-lesson-pack-lessons'),
     path('lesson-packs/<int:pack_id>/practice-exam/', views.get_lesson_pack_practice_exam, name='get-lesson-pack-practice-exam'),
-    
+
     # ============================================
     # 3. LESSONS
     # ============================================
@@ -35,13 +35,21 @@ urlpatterns = [
     path('lessons/<int:lesson_id>/update/', views.update_lesson, name='update-lesson'),
     path('lessons/<int:lesson_id>/delete/', views.delete_lesson, name='delete-lesson'),
     path('lessons/<int:lesson_id>/mark-complete/', views.mark_lesson_complete, name='mark-lesson-complete'),
-    
+
+    # ============================================
+    # 3b. LESSON CONTENT CREATION (per skill type)
+    # ============================================
+    path('lessons/<int:lesson_id>/content/reading/create/', views.create_reading_lesson_content, name='create-reading-lesson-content'),
+    path('lessons/<int:lesson_id>/content/listening/create/', views.create_listening_lesson_content, name='create-listening-lesson-content'),
+    path('lessons/<int:lesson_id>/content/speaking/create/', views.create_speaking_lesson_content, name='create-speaking-lesson-content'),
+    path('lessons/<int:lesson_id>/content/writing/create/', views.create_writing_lesson_content, name='create-writing-lesson-content'),
+
     # ============================================
     # 4. STUDENT PROGRESS
     # ============================================
     path('student/my-progress/', views.my_progress, name='my-progress'),
     path('student/lesson-packs/<int:pack_id>/mark-complete/', views.mark_lesson_pack_complete, name='mark-lesson-pack-complete'),
-    
+
     # ============================================
     # 5. PRACTICE EXAMS
     # ============================================
@@ -52,14 +60,12 @@ urlpatterns = [
     path('practice/vocabulary/create/', views.create_vocabulary_question, name='create-vocabulary-question'),
     path('practice/grammar/create/', views.create_grammar_question, name='create-grammar-question'),
 
-
     # ============================================
     # 6. READING PASSAGES & QUESTIONS
     # ============================================
     path('reading/passages/create/', views.create_reading_passage, name='create-reading-passage'),
     path('reading/passages/<int:passage_id>/', views.get_reading_passage, name='get-reading-passage'),
     path('reading/passages/<int:passage_id>/questions/create/', views.create_reading_question, name='create-reading-question'),
-# في نهاية urlpatterns اضف:
 
     # ============================================
     # 7. LISTENING AUDIOS & QUESTIONS
@@ -67,7 +73,7 @@ urlpatterns = [
     path('listening/audios/create/', views.create_listening_audio, name='create-listening-audio'),
     path('listening/audios/<int:audio_id>/', views.get_listening_audio, name='get-listening-audio'),
     path('listening/audios/<int:audio_id>/questions/create/', views.create_listening_question, name='create-listening-question'),
-    
+
     # ============================================
     # 8. SPEAKING VIDEOS & QUESTIONS
     # ============================================
