@@ -605,3 +605,140 @@ def serialize_cloudinary(value):
     if hasattr(value, 'url'):
         return value.url
     return str(value) if value else None
+
+# ============================================
+# IELTS Lesson Detail with Questions
+# ============================================
+
+class IELTSLessonQuestionSerializer(serializers.Serializer):
+    """Serializer للأسئلة المرتبطة بالدرس"""
+    id = serializers.IntegerField(read_only=True)
+    question_text = serializers.CharField()
+    question_image = serializers.SerializerMethodField()
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(allow_null=True)
+    points = serializers.IntegerField()
+    order = serializers.IntegerField()
+
+    def get_question_image(self, obj):
+        if obj.question_image:
+            return obj.question_image.url
+        return None
+
+
+class IELTSLessonDetailWithQuestionsSerializer(serializers.ModelSerializer):
+    """Serializer تفصيلي للدرس مع المحتوى والأسئلة"""
+    skill_type = serializers.CharField(
+        source='lesson_pack.skill.skill_type',
+        read_only=True
+    )
+    content = serializers.SerializerMethodField()
+    questions = serializers.SerializerMethodField()
+    questions_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IELTSLesson
+        fields = [
+            'id',
+            'lesson_pack',
+            'skill_type',
+            'title',
+            'description',
+            'order',
+            'is_active',
+            'content',
+            'questions',
+            'questions_count',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_content(self, obj):
+        skill_type = obj.lesson_pack.skill.skill_type
+
+        if skill_type == 'READING':
+            content = getattr(obj, 'reading_content', None)
+            if content:
+                return ReadingLessonContentSerializer(content).data
+
+        elif skill_type == 'WRITING':
+            content = getattr(obj, 'writing_content', None)
+            if content:
+                return WritingLessonContentSerializer(content).data
+
+        elif skill_type == 'SPEAKING':
+            content = getattr(obj, 'speaking_content', None)
+            if content:
+                return SpeakingLessonContentSerializer(content).data
+
+        elif skill_type == 'LISTENING':
+            content = getattr(obj, 'listening_content', None)
+            if content:
+                return ListeningLessonContentSerializer(content).data
+
+        return None
+
+    def get_questions(self, obj):
+        from sabr_questions.models import (
+            VocabularyQuestion, GrammarQuestion,
+            ReadingPassage, ListeningAudio,
+            SpeakingVideo
+        )
+
+        skill_type = obj.lesson_pack.skill.skill_type
+
+        if skill_type == 'READING':
+            # أسئلة القراءة مرتبطة بالـ Passage
+            content = getattr(obj, 'reading_content', None)
+            if not content or not hasattr(content, 'passage'):
+                return []
+            questions = content.passage.questions.filter(
+                is_active=True
+            ).order_by('order', 'id')
+            return IELTSLessonQuestionSerializer(questions, many=True).data
+
+        elif skill_type == 'LISTENING':
+            # أسئلة الاستماع مرتبطة بالـ Audio
+            content = getattr(obj, 'listening_content', None)
+            if not content or not hasattr(content, 'audio'):
+                return []
+            questions = content.audio.questions.filter(
+                is_active=True
+            ).order_by('order', 'id')
+            return IELTSLessonQuestionSerializer(questions, many=True).data
+
+        elif skill_type == 'SPEAKING':
+            # أسئلة التحدث مرتبطة بالـ Video
+            content = getattr(obj, 'speaking_content', None)
+            if not content or not hasattr(content, 'video'):
+                return []
+            questions = content.video.questions.filter(
+                is_active=True
+            ).order_by('order', 'id')
+            return IELTSLessonQuestionSerializer(questions, many=True).data
+
+        elif skill_type in ['VOCABULARY', 'GRAMMAR']:
+            # Vocab & Grammar مرتبطة بـ ielts_lesson مباشرة
+            if skill_type == 'VOCABULARY':
+                from sabr_questions.models import VocabularyQuestion
+                questions = VocabularyQuestion.objects.filter(
+                    ielts_lesson=obj,
+                    is_active=True
+                ).order_by('order', 'id')
+            else:
+                from sabr_questions.models import GrammarQuestion
+                questions = GrammarQuestion.objects.filter(
+                    ielts_lesson=obj,
+                    is_active=True
+                ).order_by('order', 'id')
+            return IELTSLessonQuestionSerializer(questions, many=True).data
+
+        return []
+
+    def get_questions_count(self, obj):
+        questions = self.get_questions(obj)
+        return len(questions)

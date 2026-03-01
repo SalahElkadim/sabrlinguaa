@@ -92,7 +92,8 @@ class UsageTypeMixin(models.Model):
         ('LESSON', 'Lesson Content'),        # 🆕 للأسئلة المحلولة في الدروس
         ('UNIT_EXAM', 'Unit Exam'),          # 🆕 امتحان الوحدة
         ('LEVEL_EXAM', 'Level Exam'),        # 🆕 امتحان المستوى
-        ('IELTS', 'IELTS Exam'),             # 🆕 امتحان IELTS
+        ('IELTS', 'IELTS Exam'),
+        ('IELTS_LESSON', 'IELTS Lesson'),   # ✅ جديد
         ('GENERAL', 'General Use'),
     ]
     
@@ -107,7 +108,14 @@ class UsageTypeMixin(models.Model):
     # ============================================
     # Foreign Keys للاختبارات المختلفة
     # ============================================
-    
+    ielts_lesson = models.ForeignKey(
+        'ielts.IELTSLesson',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="IELTS Lesson",
+    )
     # Existing FK (موجود بالفعل)
     placement_test = models.ForeignKey(
         'placement_test.PlacementTest',

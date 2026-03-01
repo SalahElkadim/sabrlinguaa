@@ -1205,7 +1205,6 @@ def fetch_selected_questions(selected_questions):
 # ============================================
 # 5. STUDENT EXAM SUBMISSION & RESULTS
 # ============================================
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_exam(request, attempt_id):
@@ -1280,6 +1279,19 @@ def submit_exam(request, attempt_id):
             answers_data=serializer.validated_data['answers']
         )
         
+        # ✅ تحديث placement_test_taken للطالب
+        try:
+            from sabr_auth.models import Student
+            
+            student = Student.objects.get(user=request.user)
+            if not student.placement_test_taken:
+                student.placement_test_taken = True
+                student.placement_test_date = timezone.now().date()
+                student.save(update_fields=['placement_test_taken', 'placement_test_date'])
+                
+        except Student.DoesNotExist:
+            logger.warning(f"Student profile not found for user {request.user.id}")
+        
         return Response({
             'message': 'تم تقديم الامتحان بنجاح',
             'result': result
@@ -1296,7 +1308,6 @@ def submit_exam(request, attempt_id):
             'error': 'حدث خطأ أثناء تقديم الامتحان',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

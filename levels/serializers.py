@@ -459,21 +459,36 @@ class LevelExamCreateUpdateSerializer(serializers.ModelSerializer):
 # ============================================
 # 6. STUDENT PROGRESS SERIALIZERS
 # ============================================
-
 class StudentLevelSerializer(serializers.ModelSerializer):
     """تقدم الطالب في المستوى"""
     level_details = LevelListSerializer(source='level', read_only=True)
     current_unit_details = UnitNestedSerializer(source='current_unit', read_only=True)
-    
+    units_progress = serializers.SerializerMethodField()
+
     class Meta:
         model = StudentLevel
         fields = [
             'id', 'student', 'level', 'level_details',
             'status', 'current_unit', 'current_unit_details',
+            'units_progress',
             'started_at', 'completed_at',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['student', 'started_at', 'completed_at']
+
+    def get_units_progress(self, obj):
+        total_units = obj.level.get_units_count()
+        passed_units = StudentUnit.objects.filter(
+            student=obj.student,
+            unit__level=obj.level,
+            status='COMPLETED',
+        ).count()
+
+        return {
+            'passed': passed_units,
+            'total': total_units,
+            'percentage': round((passed_units / total_units * 100), 2) if total_units > 0 else 0
+        }
 
 
 class StudentUnitSerializer(serializers.ModelSerializer):

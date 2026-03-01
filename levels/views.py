@@ -2195,7 +2195,6 @@ def complete_lesson(request, lesson_id):
         }
     }, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_progress(request):
@@ -2203,39 +2202,33 @@ def my_progress(request):
     عرض تقدم الطالب الكامل
     
     GET /api/levels/student/my-progress/
-    
-    Query Parameters:
-    - level_id: filter by specific level
     """
     level_id = request.query_params.get('level_id', None)
-    
-    # المستويات
+
     student_levels = StudentLevel.objects.filter(
         student=request.user
     ).select_related('level', 'current_unit').order_by('level__order')
-    
+
     if level_id:
         student_levels = student_levels.filter(level_id=level_id)
-    
+
     levels_data = []
     for sl in student_levels:
-        # الوحدات
         student_units = StudentUnit.objects.filter(
             student=request.user,
             unit__level=sl.level
         ).select_related('unit').order_by('unit__order')
-        
+
         units_data = []
         for su in student_units:
-            # الدروس
             completed_lessons = StudentLesson.objects.filter(
                 student=request.user,
                 lesson__unit=su.unit,
                 is_completed=True
             ).count()
-            
+
             total_lessons = su.unit.get_lessons_count()
-            
+
             units_data.append({
                 'id': su.id,
                 'unit': {
@@ -2249,7 +2242,7 @@ def my_progress(request):
                 'started_at': su.started_at,
                 'completed_at': su.completed_at
             })
-        
+
         levels_data.append({
             'id': sl.id,
             'level': {
@@ -2266,26 +2259,38 @@ def my_progress(request):
             'completed_at': sl.completed_at,
             'units': units_data
         })
-    
+
+    # ============================================
     # إحصائيات عامة
+    # ============================================
     total_levels = StudentLevel.objects.filter(student=request.user).count()
     completed_levels = StudentLevel.objects.filter(
-        student=request.user,
-        status='COMPLETED'
+        student=request.user, status='COMPLETED'
     ).count()
-    
+
     total_units = StudentUnit.objects.filter(student=request.user).count()
     completed_units = StudentUnit.objects.filter(
-        student=request.user,
-        status='COMPLETED'
+        student=request.user, status='COMPLETED'
     ).count()
-    
+
+    # ✅ الوحدات المُجتازة (اللي عدت الامتحان)
+    passed_units = StudentUnit.objects.filter(
+        student=request.user,
+        status='COMPLETED',
+        exam_passed=True
+    ).count()
+
+    # ✅ إجمالي الوحدات في كل المستويات اللي الطالب مسجل فيها
+    total_units_in_enrolled_levels = Unit.objects.filter(
+        level__student_levels__student=request.user,
+        is_active=True
+    ).count()
+
     total_lessons = StudentLesson.objects.filter(student=request.user).count()
     completed_lessons = StudentLesson.objects.filter(
-        student=request.user,
-        is_completed=True
+        student=request.user, is_completed=True
     ).count()
-    
+
     return Response({
         'summary': {
             'levels': {
@@ -2296,7 +2301,11 @@ def my_progress(request):
             'units': {
                 'total': total_units,
                 'completed': completed_units,
-                'in_progress': total_units - completed_units
+                'in_progress': total_units - completed_units,
+                # ✅ نسبة الوحدات المُجتازة من إجمالي وحدات المستويات المسجل فيها
+                'overall_completion_percentage': round(
+                    (passed_units / total_units_in_enrolled_levels * 100), 2
+                ) if total_units_in_enrolled_levels > 0 else 0
             },
             'lessons': {
                 'total': total_lessons,
@@ -2306,7 +2315,6 @@ def my_progress(request):
         },
         'levels': levels_data
     }, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -2602,7 +2610,6 @@ def fetch_selected_questions_data(selected_questions):
 # ============================================
 # 10. UNIT EXAM - START & SUBMIT
 # ============================================
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def start_unit_exam(request, unit_id):
@@ -2611,16 +2618,13 @@ def start_unit_exam(request, unit_id):
     
     POST /api/levels/student/exams/unit/start/{unit_id}/ 
     """
-    # ✅ جلب الـ Unit
     unit = get_object_or_404(Unit, id=unit_id, is_active=True)
-    
-    # ✅ جلب الامتحان التلقائي
     unit_exam = get_object_or_404(UnitExam, unit=unit)
     
     # التحقق من أن الطالب في الوحدة
     student_unit = StudentUnit.objects.filter(
         student=request.user,
-        unit=unit,  # ← استخدم unit مباشرة
+        unit=unit,
         status='IN_PROGRESS'
     ).first()
     
@@ -2670,23 +2674,8 @@ def start_unit_exam(request, unit_id):
             }
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # التحقق من عدم وجود محاولة نشطة
-    active_attempt = StudentUnitExamAttempt.objects.filter(
-        student=request.user,
-        unit_exam=unit_exam,
-        submitted_at__isnull=True
-    ).first()
-    
-    if active_attempt:
-        return Response({
-            'error': 'لديك محاولة نشطة بالفعل',
-            'attempt_id': active_attempt.id,
-            'started_at': active_attempt.started_at
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
     # إنشاء المحاولة
     with transaction.atomic():
-        # حساب رقم المحاولة
         last_attempt = StudentUnitExamAttempt.objects.filter(
             student=request.user,
             unit_exam=unit_exam
@@ -2694,10 +2683,8 @@ def start_unit_exam(request, unit_id):
         
         attempt_number = (last_attempt.attempt_number + 1) if last_attempt else 1
         
-        # اختيار الأسئلة العشوائية
         selected_questions = select_random_questions_for_unit_exam(question_bank, unit_exam)
         
-        # إنشاء المحاولة
         attempt = StudentUnitExamAttempt.objects.create(
             student=request.user,
             unit_exam=unit_exam,
@@ -2706,7 +2693,6 @@ def start_unit_exam(request, unit_id):
             started_at=timezone.now()
         )
         
-        # جلب بيانات الأسئلة
         exam_questions = fetch_selected_questions_data(selected_questions)
     
     return Response({
@@ -2896,17 +2882,15 @@ def start_level_exam(request, level_id):
     """
     بدء امتحان مستوى
     
-    POST /api/levels/student/exams/level/start/{level_id}/  ← تغيير
+    POST /api/levels/student/exams/level/start/{level_id}/
     """
     level = get_object_or_404(Level, id=level_id, is_active=True)
-    
-    # ✅ جلب الامتحان التلقائي
     level_exam = get_object_or_404(LevelExam, level=level)
     
     # التحقق من أن الطالب في المستوى
     student_level = StudentLevel.objects.filter(
         student=request.user,
-        level=level,  # ← استخدم level مباشرة
+        level=level,
         status='IN_PROGRESS'
     ).first()
     
@@ -2963,23 +2947,8 @@ def start_level_exam(request, level_id):
             }
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # التحقق من عدم وجود محاولة نشطة
-    active_attempt = StudentLevelExamAttempt.objects.filter(
-        student=request.user,
-        level_exam=level_exam,
-        submitted_at__isnull=True
-    ).first()
-    
-    if active_attempt:
-        return Response({
-            'error': 'لديك محاولة نشطة بالفعل',
-            'attempt_id': active_attempt.id,
-            'started_at': active_attempt.started_at
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
     # إنشاء المحاولة
     with transaction.atomic():
-        # حساب رقم المحاولة
         last_attempt = StudentLevelExamAttempt.objects.filter(
             student=request.user,
             level_exam=level_exam
@@ -2987,10 +2956,8 @@ def start_level_exam(request, level_id):
         
         attempt_number = (last_attempt.attempt_number + 1) if last_attempt else 1
         
-        # اختيار الأسئلة العشوائية
         selected_questions = select_random_questions_for_level_exam(question_bank, level_exam)
         
-        # إنشاء المحاولة
         attempt = StudentLevelExamAttempt.objects.create(
             student=request.user,
             level_exam=level_exam,
@@ -2999,7 +2966,6 @@ def start_level_exam(request, level_id):
             started_at=timezone.now()
         )
         
-        # جلب بيانات الأسئلة
         exam_questions = fetch_selected_questions_data(selected_questions)
     
     return Response({

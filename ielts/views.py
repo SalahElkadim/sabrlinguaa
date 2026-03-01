@@ -26,6 +26,7 @@ from .models import (
 from .serializers import (
     IELTSSkillSerializer,
     IELTSSkillListSerializer,
+    IELTSLessonDetailWithQuestionsSerializer,
     LessonPackListSerializer,
     LessonPackDetailSerializer,
     IELTSLessonListSerializer,
@@ -374,12 +375,11 @@ def list_lessons(request):
         'lessons': serializer.data
     }, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_lesson(request, lesson_id):
     """
-    عرض تفاصيل درس (مع المحتوى)
+    عرض تفاصيل درس مع المحتوى والأسئلة
     
     GET /api/ielts/lessons/{lesson_id}/
     """
@@ -387,9 +387,270 @@ def get_lesson(request, lesson_id):
         IELTSLesson.objects.select_related('lesson_pack__skill'),
         id=lesson_id
     )
-    serializer = IELTSLessonDetailSerializer(lesson)
-    
+    serializer = IELTSLessonDetailWithQuestionsSerializer(lesson)
+
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_lesson_with_content_and_questions(request):
+    """
+    إنشاء درس + محتوى + أسئلة في request واحد
+    
+    POST /api/ielts/lessons/create-full/
+    
+    Body for READING:
+    {
+        "lesson_pack": 1,
+        "title": "Reading Academic Texts",
+        "description": "...",
+        "order": 1,
+        "content": {
+            "reading_text": "Academic texts are formal writings...",
+            "explanation": "شرح الدرس",
+            "vocabulary_words": ["formal", "academic"],
+            "examples": [],
+            "video_url": null
+        },
+        "questions": [
+            {
+                "question_text": "What is the main topic?",
+                "choice_a": "Sports",
+                "choice_b": "Academic writing",
+                "choice_c": "History",
+                "choice_d": "Science",
+                "correct_answer": "B",
+                "explanation": "The text is about academic writing",
+                "points": 1,
+                "order": 1
+            }
+        ]
+    }
+    
+    Body for LISTENING:
+    {
+        "lesson_pack": 2,
+        "title": "Listening to a Lecture",
+        "description": "...",
+        "order": 1,
+        "content": {
+            "audio_file": "https://res.cloudinary.com/.../audio.mp3",
+            "transcript": "...",
+            "vocabulary_explanation": "...",
+            "tips": []
+        },
+        "questions": [ ... ]
+    }
+    """
+    lesson_pack_id = request.data.get('lesson_pack')
+    title = request.data.get('title')
+    description = request.data.get('description', '')
+    order = request.data.get('order', 0)
+    content_data = request.data.get('content', {})
+    questions_data = request.data.get('questions', [])
+
+    if not lesson_pack_id or not title:
+        return Response({
+            'error': 'يجب إرسال lesson_pack و title'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    lesson_pack = get_object_or_404(LessonPack, id=lesson_pack_id)
+    skill_type = lesson_pack.skill.skill_type
+
+    try:
+        with transaction.atomic():
+            # 1. إنشاء الدرس
+            lesson = IELTSLesson.objects.create(
+                lesson_pack=lesson_pack,
+                title=title,
+                description=description,
+                order=order,
+                is_active=request.data.get('is_active', True)
+            )
+
+            # 2. إنشاء المحتوى حسب الـ skill_type
+            if skill_type == 'READING':
+                from .models import ReadingLessonContent
+                from sabr_questions.models import ReadingPassage, ReadingQuestion
+
+                # إنشاء المحتوى
+                content = ReadingLessonContent.objects.create(
+                    lesson=lesson,
+                    reading_text=content_data.get('reading_text', ''),
+                    explanation=content_data.get('explanation', ''),
+                    vocabulary_words=content_data.get('vocabulary_words', []),
+                    examples=content_data.get('examples', []),
+                    video_url=content_data.get('video_url'),
+                    resources=content_data.get('resources', [])
+                )
+
+                # إنشاء Passage للأسئلة
+                if questions_data:
+                    passage = ReadingPassage.objects.create(
+                        title=title,
+                        passage_text=content_data.get('reading_text', ''),
+                        usage_type='IELTS_LESSON',
+                        ielts_lesson_pack=lesson_pack,
+                        ielts_lesson=lesson,
+                    )
+
+                    for q in questions_data:
+                        ReadingQuestion.objects.create(
+                            passage=passage,
+                            question_text=q.get('question_text'),
+                            choice_a=q.get('choice_a'),
+                            choice_b=q.get('choice_b'),
+                            choice_c=q.get('choice_c'),
+                            choice_d=q.get('choice_d'),
+                            correct_answer=q.get('correct_answer'),
+                            explanation=q.get('explanation', ''),
+                            points=q.get('points', 1),
+                            order=q.get('order', 0),
+                        )
+
+            elif skill_type == 'LISTENING':
+                from .models import ListeningLessonContent
+                from sabr_questions.models import ListeningAudio, ListeningQuestion
+
+                audio_url = content_data.get('audio_file')
+                if not audio_url:
+                    raise ValueError('audio_file مطلوب لدرس الاستماع')
+
+                # إنشاء ListeningAudio
+                audio = ListeningAudio(
+                    title=title,
+                    transcript=content_data.get('transcript', ''),
+                    duration=content_data.get('duration', 0),
+                    usage_type='IELTS_LESSON',
+                    ielts_lesson_pack=lesson_pack,
+                    ielts_lesson=lesson,
+                )
+
+                # تعيين audio_file من Cloudinary URL
+                if 'cloudinary.com' in audio_url:
+                    from cloudinary.models import CloudinaryResource
+                    parts = audio_url.split('/upload/')
+                    public_id = '/'.join(parts[1].split('/')[1:]).rsplit('.', 1)[0] if len(parts) > 1 else 'default'
+                    audio.audio_file = CloudinaryResource(
+                        public_id=public_id,
+                        format='mp3',
+                        resource_type='video'
+                    )
+                audio.save()
+
+                # إنشاء المحتوى
+                content = ListeningLessonContent.objects.create(
+                    lesson=lesson,
+                    audio_file=audio_url,
+                    transcript=content_data.get('transcript', ''),
+                    vocabulary_explanation=content_data.get('vocabulary_explanation', ''),
+                    listening_exercises=content_data.get('listening_exercises', []),
+                    tips=content_data.get('tips', [])
+                )
+
+                # إنشاء الأسئلة
+                for q in questions_data:
+                    ListeningQuestion.objects.create(
+                        audio=audio,
+                        question_text=q.get('question_text'),
+                        choice_a=q.get('choice_a'),
+                        choice_b=q.get('choice_b'),
+                        choice_c=q.get('choice_c'),
+                        choice_d=q.get('choice_d'),
+                        correct_answer=q.get('correct_answer'),
+                        explanation=q.get('explanation', ''),
+                        points=q.get('points', 1),
+                        order=q.get('order', 0),
+                    )
+
+            elif skill_type == 'SPEAKING':
+                from .models import SpeakingLessonContent
+                from sabr_questions.models import SpeakingVideo, SpeakingQuestion
+
+                video_url = content_data.get('video_file')
+                if not video_url:
+                    raise ValueError('video_file مطلوب لدرس التحدث')
+
+                # إنشاء SpeakingVideo
+                video = SpeakingVideo(
+                    title=title,
+                    description=content_data.get('description', ''),
+                    duration=content_data.get('duration', 0),
+                    usage_type='IELTS_LESSON',
+                    ielts_lesson_pack=lesson_pack,
+                    ielts_lesson=lesson,
+                )
+
+                if 'cloudinary.com' in video_url:
+                    from cloudinary.models import CloudinaryResource
+                    parts = video_url.split('/upload/')
+                    public_id = '/'.join(parts[1].split('/')[1:]).rsplit('.', 1)[0] if len(parts) > 1 else 'default'
+                    video.video_file = CloudinaryResource(
+                        public_id=public_id,
+                        format='mp4',
+                        resource_type='video'
+                    )
+                video.save()
+
+                # إنشاء المحتوى
+                content = SpeakingLessonContent.objects.create(
+                    lesson=lesson,
+                    video_file=video_url,
+                    dialogue_texts=content_data.get('dialogue_texts', []),
+                    useful_phrases=content_data.get('useful_phrases', []),
+                    audio_examples=content_data.get('audio_examples', []),
+                    pronunciation_tips=content_data.get('pronunciation_tips', '')
+                )
+
+                # إنشاء الأسئلة
+                for q in questions_data:
+                    SpeakingQuestion.objects.create(
+                        video=video,
+                        question_text=q.get('question_text'),
+                        choice_a=q.get('choice_a'),
+                        choice_b=q.get('choice_b'),
+                        choice_c=q.get('choice_c'),
+                        choice_d=q.get('choice_d'),
+                        correct_answer=q.get('correct_answer'),
+                        explanation=q.get('explanation', ''),
+                        points=q.get('points', 1),
+                        order=q.get('order', 0),
+                    )
+
+            elif skill_type == 'WRITING':
+                from .models import WritingLessonContent
+
+                content = WritingLessonContent.objects.create(
+                    lesson=lesson,
+                    sample_texts=content_data.get('sample_texts', []),
+                    writing_instructions=content_data.get('writing_instructions', ''),
+                    tips=content_data.get('tips', []),
+                    examples=content_data.get('examples', []),
+                    video_url=content_data.get('video_url')
+                )
+                # Writing مفيهاش MCQ
+
+        result_serializer = IELTSLessonDetailWithQuestionsSerializer(lesson)
+
+        return Response({
+            'message': 'تم إنشاء الدرس والمحتوى والأسئلة بنجاح',
+            'lesson': result_serializer.data,
+            'questions_created': len(questions_data)
+        }, status=status.HTTP_201_CREATED)
+
+    except ValueError as e:
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        logger.error(f"Error creating IELTS lesson with content: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': f'حدث خطأ: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
