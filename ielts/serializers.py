@@ -75,6 +75,16 @@ class WritingLessonContentSerializer(serializers.ModelSerializer):
 
 
 class SpeakingLessonContentSerializer(serializers.ModelSerializer):
+    video_file = serializers.SerializerMethodField()
+
+    def get_video_file(self, obj):
+        if not obj.video_file:
+            return None
+        url = str(obj.video_file)
+        if 'upload/http' in url:
+            return url.split('upload/')[-1]
+        return url
+
     class Meta:
         model = SpeakingLessonContent
         fields = [
@@ -86,6 +96,16 @@ class SpeakingLessonContentSerializer(serializers.ModelSerializer):
 
 
 class ListeningLessonContentSerializer(serializers.ModelSerializer):
+    audio_file = serializers.SerializerMethodField()
+
+    def get_audio_file(self, obj):
+        if not obj.audio_file:
+            return None
+        url = str(obj.audio_file)
+        if 'upload/http' in url:
+            return url.split('upload/')[-1]
+        return url
+
     class Meta:
         model = ListeningLessonContent
         fields = [
