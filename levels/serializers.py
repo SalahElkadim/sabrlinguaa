@@ -661,7 +661,7 @@ class StudentUnitExamAttemptResultSerializer(serializers.ModelSerializer):
             'started_at', 'submitted_at',
             'created_at', 'updated_at'
         ]
-        
+
 class StudentLevelExamAttemptSerializer(serializers.ModelSerializer):
     """محاولة امتحان المستوى"""
     level_exam_details = LevelExamSerializer(source='level_exam', read_only=True)
@@ -676,3 +676,17 @@ class StudentLevelExamAttemptSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['student', 'generated_questions', 'score', 'passed', 'submitted_at']
+
+class StudentLevelExamAttemptResultSerializer(serializers.ModelSerializer):
+    """للـ submit response بدون generated_questions و answers"""
+    level_exam_details = LevelExamSerializer(source='level_exam', read_only=True)
+    
+    class Meta:
+        model = StudentLevelExamAttempt
+        fields = [
+            'id', 'student', 'level_exam', 'level_exam_details',
+            'attempt_number',
+            'score', 'passed', 'time_taken',
+            'started_at', 'submitted_at',
+            'created_at', 'updated_at'
+        ]

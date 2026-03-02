@@ -22,7 +22,7 @@ from levels.models import (
 
 from levels.serializers import (
     # Level Serializers
-    LevelListSerializer, LevelDetailSerializer, LevelCreateUpdateSerializer,StudentUnitExamAttemptResultSerializer,
+    LevelListSerializer, LevelDetailSerializer, LevelCreateUpdateSerializer,StudentUnitExamAttemptResultSerializer,StudentLevelExamAttemptResultSerializer,
     # Unit Serializers
     UnitDetailSerializer, UnitCreateUpdateSerializer,
     # Lesson Serializers
@@ -3124,7 +3124,8 @@ def submit_level_exam(request, attempt_id):
             student_level.completed_at = timezone.now()
             student_level.save()
     
-    serializer = StudentLevelExamAttemptSerializer(attempt)
+    serializer = StudentLevelExamAttemptResultSerializer(attempt)
+
     
     return Response({
         'message': 'تم تسليم امتحان المستوى بنجاح',
