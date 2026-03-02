@@ -1480,3 +1480,44 @@ def get_writing_question(request, question_id):
         })
     except WritingQuestion.DoesNotExist:
         return Response({'error': 'السؤال غير موجود'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_ielts_score(request):
+    """
+    GET /api/ielts/student/my-score/
+    """
+    skills = ['READING', 'WRITING', 'SPEAKING', 'LISTENING']
+    skill_scores = {}
+    total_score = 0
+    total_available = 0
+
+    for skill_type in skills:
+        total_packs = LessonPack.objects.filter(
+            skill__skill_type=skill_type,
+            is_active=True
+        ).count()
+
+        passed_packs = StudentPracticeExamAttempt.objects.filter(
+            student=request.user,
+            passed=True,
+            practice_exam__lesson_pack__skill__skill_type=skill_type
+        ).values('practice_exam__lesson_pack').distinct().count()
+
+        total_score += passed_packs
+        total_available += total_packs
+
+        skill_scores[skill_type] = {
+            'score': passed_packs,
+            'total': total_packs,
+            'percentage': round((passed_packs / total_packs * 100), 1) if total_packs > 0 else 0,
+        }
+
+    overall_percentage = round((total_score / total_available * 100), 1) if total_available > 0 else 0
+
+    return Response({
+        'total_score': total_score,
+        'total_available': total_available,
+        'overall_percentage': overall_percentage,
+        'skills': skill_scores,
+    })

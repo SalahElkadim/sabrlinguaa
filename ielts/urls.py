@@ -86,4 +86,5 @@ urlpatterns = [
     # ============================================
     path('writing/questions/create/', views.create_writing_question, name='create-writing-question'),
     path('writing/questions/<int:question_id>/', views.get_writing_question, name='get-writing-question'),
+    path('student/my-score/', views.my_ielts_score, name='my-ielts-score'),
 ]
