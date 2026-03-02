@@ -22,7 +22,7 @@ from levels.models import (
 
 from levels.serializers import (
     # Level Serializers
-    LevelListSerializer, LevelDetailSerializer, LevelCreateUpdateSerializer,
+    LevelListSerializer, LevelDetailSerializer, LevelCreateUpdateSerializer,StudentUnitExamAttemptResultSerializer,
     # Unit Serializers
     UnitDetailSerializer, UnitCreateUpdateSerializer,
     # Lesson Serializers
@@ -2861,7 +2861,7 @@ def submit_unit_exam(request, attempt_id):
                 status='COMPLETED'
             ).count()
     
-    serializer = StudentUnitExamAttemptSerializer(attempt)
+    serializer = StudentUnitExamAttemptResultSerializer(attempt)
     
     return Response({
         'message': 'تم تسليم الامتحان بنجاح',
