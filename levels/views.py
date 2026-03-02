@@ -2281,8 +2281,12 @@ def my_progress(request):
     ).count()
 
     # ✅ إجمالي الوحدات في كل المستويات اللي الطالب مسجل فيها
+    enrolled_level_ids = StudentLevel.objects.filter(
+        student=request.user
+    ).values_list('level_id', flat=True)
+
     total_units_in_enrolled_levels = Unit.objects.filter(
-        level__student_levels__student=request.user,
+        level__in=enrolled_level_ids,
         is_active=True
     ).count()
 
