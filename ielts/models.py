@@ -664,7 +664,7 @@ class StudentSpeakingRecording(TimeStampedModel):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.student.username} - {self.task.task_text[:30]}"
+        return f"{self.student.email} - {self.task.task_text[:30]}"
     
     def calculate_total_score(self):
         """حساب الدرجة الإجمالية"""
@@ -722,7 +722,7 @@ class StudentLessonPackProgress(TimeStampedModel):
     
     def __str__(self):
         status = "✓" if self.is_completed else "✗"
-        return f"{status} {self.student.username} - {self.lesson_pack.title}"
+        return f"{status} {self.student.email} - {self.lesson_pack.title}"
     
     def mark_completed(self):
         """تحديد كمكتمل"""
@@ -766,7 +766,7 @@ class StudentLessonProgress(TimeStampedModel):
     
     def __str__(self):
         status = "✓" if self.is_completed else "✗"
-        return f"{status} {self.student.username} - {self.lesson.title}"
+        return f"{status} {self.student.email} - {self.lesson.title}"
 
 
 class StudentPracticeExamAttempt(TimeStampedModel):
@@ -844,7 +844,7 @@ class StudentPracticeExamAttempt(TimeStampedModel):
     
     def __str__(self):
         status = "✓ Passed" if self.passed else "✗ Failed" if self.score is not None else "In Progress"
-        return f"{self.student.username} - {self.practice_exam.title} - Attempt #{self.attempt_number} ({status})"
+        return f"{self.student.email} - {self.practice_exam.title} - Attempt #{self.attempt_number} ({status})"
     
     def mark_submitted(self):
         """تحديد كمسلّم"""
