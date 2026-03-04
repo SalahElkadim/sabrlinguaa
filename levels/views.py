@@ -2558,58 +2558,89 @@ def select_random_questions_for_level_exam(question_bank, level_exam):
     
     return selected_questions
 
-
 def fetch_selected_questions_data(selected_questions):
-    """
-    جلب بيانات الأسئلة المختارة
-    """
     from placement_test.serializers import (
         VocabularyQuestionSerializer,
         GrammarQuestionSerializer,
         ReadingQuestionSerializer,
-        ListeningQuestionSerializer,
-        SpeakingQuestionSerializer,
         WritingQuestionSerializer
     )
-    
+
     exam_questions = {}
-    
+
     # Vocabulary
     vocab_questions = VocabularyQuestion.objects.filter(
         id__in=selected_questions['vocabulary']
     ).select_related('question_set')
     exam_questions['vocabulary'] = VocabularyQuestionSerializer(vocab_questions, many=True).data
-    
+
     # Grammar
     grammar_questions = GrammarQuestion.objects.filter(
         id__in=selected_questions['grammar']
     ).select_related('question_set')
     exam_questions['grammar'] = GrammarQuestionSerializer(grammar_questions, many=True).data
-    
+
     # Reading
     reading_questions = ReadingQuestion.objects.filter(
         id__in=selected_questions['reading']
     ).select_related('passage')
     exam_questions['reading'] = ReadingQuestionSerializer(reading_questions, many=True).data
-    
-    # Listening
+
+    # ✅ Listening - مع الـ audio URL
     listening_questions = ListeningQuestion.objects.filter(
         id__in=selected_questions['listening']
     ).select_related('audio')
-    exam_questions['listening'] = ListeningQuestionSerializer(listening_questions, many=True).data
     
-    # Speaking
+    exam_questions['listening'] = []
+    for lq in listening_questions:
+        exam_questions['listening'].append({
+            'id': lq.id,
+            'audio_id': lq.audio.id,
+            'audio_title': lq.audio.title,
+            'audio_url': lq.audio.audio_file.url if lq.audio.audio_file else None,
+            'transcript': lq.audio.transcript,
+            'question_text': lq.question_text,
+            'question_image': lq.question_image.url if lq.question_image else None,
+            'choice_a': lq.choice_a,
+            'choice_b': lq.choice_b,
+            'choice_c': lq.choice_c,
+            'choice_d': lq.choice_d,
+            'correct_answer': lq.correct_answer,
+            'explanation': lq.explanation,
+            'points': lq.points,
+            'order': lq.order,
+        })
+
+    # ✅ Speaking - مع الـ video URL
     speaking_questions = SpeakingQuestion.objects.filter(
         id__in=selected_questions['speaking']
     ).select_related('video')
-    exam_questions['speaking'] = SpeakingQuestionSerializer(speaking_questions, many=True).data
-    
+    exam_questions['speaking'] = []
+    for sq in speaking_questions:
+        exam_questions['speaking'].append({
+            'id': sq.id,
+            'video_id': sq.video.id,
+            'video_title': sq.video.title,
+            'video_url': sq.video.video_file.url if sq.video.video_file else None,
+            'thumbnail': sq.video.thumbnail.url if sq.video.thumbnail else None,
+            'question_text': sq.question_text,
+            'question_image': sq.question_image.url if sq.question_image else None,
+            'choice_a': sq.choice_a,
+            'choice_b': sq.choice_b,
+            'choice_c': sq.choice_c,
+            'choice_d': sq.choice_d,
+            'correct_answer': sq.correct_answer,
+            'explanation': sq.explanation,
+            'points': sq.points,
+            'order': sq.order,
+        })
+
     # Writing
     writing_questions = WritingQuestion.objects.filter(
         id__in=selected_questions['writing']
     )
     exam_questions['writing'] = WritingQuestionSerializer(writing_questions, many=True).data
-    
+
     return exam_questions
 # ============================================
 # 10. UNIT EXAM - START & SUBMIT
