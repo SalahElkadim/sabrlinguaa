@@ -2629,7 +2629,7 @@ def start_unit_exam(request, unit_id):
     student_unit = StudentUnit.objects.filter(
         student=request.user,
         unit=unit,
-        status='IN_PROGRESS'
+        status__in=['IN_PROGRESS', 'COMPLETED']  # ← السماح بالاثنين
     ).first()
     
     if not student_unit:
@@ -2895,7 +2895,7 @@ def start_level_exam(request, level_id):
     student_level = StudentLevel.objects.filter(
         student=request.user,
         level=level,
-        status='IN_PROGRESS'
+        status__in=['IN_PROGRESS', 'COMPLETED']  # ← السماح بالاثنين
     ).first()
     
     if not student_level:
