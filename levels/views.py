@@ -2736,11 +2736,20 @@ def submit_unit_exam(request, attempt_id):
     )
     
     if attempt.submitted_at:
+        serializer = StudentUnitExamAttemptResultSerializer(attempt)
         return Response({
-            'error': 'تم تسليم هذا الامتحان بالفعل',
-            'score': attempt.score,
-            'passed': attempt.passed
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'message': 'تم تسليم هذا الامتحان مسبقاً',
+            'result': {
+                'attempt': serializer.data,
+                'score': attempt.score,
+                'max_score': 100,
+                'passed': attempt.passed,
+                'passing_score': attempt.unit_exam.passing_score,
+                'time_taken_seconds': attempt.time_taken,
+                'time_taken_minutes': round(attempt.time_taken / 60, 2)
+            },
+            'unit_status': 'COMPLETED' if attempt.passed else 'FAILED'
+        }, status=status.HTTP_200_OK)
     
     answers = request.data.get('answers', {})
     
@@ -3009,11 +3018,20 @@ def submit_level_exam(request, attempt_id):
     )
     
     if attempt.submitted_at:
+        serializer = StudentUnitExamAttemptResultSerializer(attempt)
         return Response({
-            'error': 'تم تسليم هذا الامتحان بالفعل',
-            'score': attempt.score,
-            'passed': attempt.passed
-        }, status=status.HTTP_400_BAD_REQUEST)
+            'message': 'تم تسليم هذا الامتحان مسبقاً',
+            'result': {
+                'attempt': serializer.data,
+                'score': attempt.score,
+                'max_score': 100,
+                'passed': attempt.passed,
+                'passing_score': attempt.unit_exam.passing_score,
+                'time_taken_seconds': attempt.time_taken,
+                'time_taken_minutes': round(attempt.time_taken / 60, 2)
+            },
+            'unit_status': 'COMPLETED' if attempt.passed else 'FAILED'
+        }, status=status.HTTP_200_OK)
     
     answers = request.data.get('answers', {})
     
