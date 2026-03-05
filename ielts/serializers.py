@@ -449,7 +449,6 @@ class IELTSLessonDetailWithQuestionsSerializer(serializers.ModelSerializer):
         skill_type = obj.lesson_pack.skill.skill_type
 
         if skill_type == 'READING':
-            # أسئلة القراءة — نجيب الـ Passage المرتبط بالـ lesson
             passage = ReadingPassage.objects.filter(
                 ielts_lesson=obj, is_active=True
             ).first()
@@ -459,7 +458,6 @@ class IELTSLessonDetailWithQuestionsSerializer(serializers.ModelSerializer):
             return IELTSLessonQuestionSerializer(questions, many=True).data
 
         elif skill_type == 'LISTENING':
-            # أسئلة الاستماع — نجيب الـ Audio المرتبط بالـ lesson
             audio = ListeningAudio.objects.filter(
                 ielts_lesson=obj, is_active=True
             ).first()
@@ -469,7 +467,6 @@ class IELTSLessonDetailWithQuestionsSerializer(serializers.ModelSerializer):
             return IELTSLessonQuestionSerializer(questions, many=True).data
 
         elif skill_type == 'SPEAKING':
-            # أسئلة التحدث — نجيب الـ Video المرتبط بالـ lesson
             video = SpeakingVideo.objects.filter(
                 ielts_lesson=obj, is_active=True
             ).first()
@@ -477,6 +474,26 @@ class IELTSLessonDetailWithQuestionsSerializer(serializers.ModelSerializer):
                 return []
             questions = video.questions.filter(is_active=True).order_by('order', 'id')
             return IELTSLessonQuestionSerializer(questions, many=True).data
+
+        elif skill_type == 'WRITING':
+            from sabr_questions.models import WritingQuestion
+            question = WritingQuestion.objects.filter(
+                ielts_lesson=obj,
+                is_active=True
+            ).first()
+            if not question:
+                return []
+            return [{
+                'id': question.id,
+                'title': question.title,
+                'question_text': question.question_text,
+                'min_words': question.min_words,
+                'max_words': question.max_words,
+                'sample_answer': question.sample_answer,
+                'rubric': question.rubric,
+                'points': question.points,
+                'pass_threshold': question.pass_threshold,
+            }]
 
         elif skill_type in ['VOCABULARY', 'GRAMMAR']:
             if skill_type == 'VOCABULARY':
