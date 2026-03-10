@@ -172,11 +172,6 @@ class StudentSTEPProgressAdmin(admin.ModelAdmin):
         )
     progress_display.short_description = 'تفاصيل التقدم'
 
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return True
 
 
 # ============================================
@@ -225,9 +220,3 @@ class StudentSTEPQuestionViewAdmin(admin.ModelAdmin):
             color, label
         )
     question_type_badge.short_description = 'نوع السؤال'
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return True
