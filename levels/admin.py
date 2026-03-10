@@ -189,11 +189,7 @@ class StudentLevelAdmin(admin.ModelAdmin):
         'started_at', 'completed_at', 'created_at', 'updated_at'
     ]
     
-    def has_add_permission(self, request):
-        return False
     
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(StudentUnit)
@@ -210,12 +206,7 @@ class StudentUnitAdmin(admin.ModelAdmin):
         'student', 'unit', 'status', 'lessons_completed', 
         'exam_passed', 'started_at', 'completed_at', 'created_at', 'updated_at'
     ]
-    
-    def has_add_permission(self, request):
-        return False
-    
-    def has_delete_permission(self, request, obj=None):
-        return False
+ 
 
 
 @admin.register(StudentLesson)
@@ -229,11 +220,7 @@ class StudentLessonAdmin(admin.ModelAdmin):
         'completed_at', 'created_at', 'updated_at'
     ]
     
-    def has_add_permission(self, request):
-        return False
     
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(StudentUnitExamAttempt)
@@ -265,11 +252,7 @@ class StudentUnitExamAttemptAdmin(admin.ModelAdmin):
         }),
     )
     
-    def has_add_permission(self, request):
-        return False
     
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(StudentLevelExamAttempt)
@@ -301,8 +284,4 @@ class StudentLevelExamAttemptAdmin(admin.ModelAdmin):
         }),
     )
     
-    def has_add_permission(self, request):
-        return False
-    
-    def has_delete_permission(self, request, obj=None):
-        return False
+  
