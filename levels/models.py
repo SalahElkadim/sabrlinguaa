@@ -596,7 +596,7 @@ class StudentLevel(TimeStampedModel):
         ordering = ['student', 'level__order']
     
     def __str__(self):
-        return f"{self.student.username} - {self.level.code} ({self.get_status_display()})"
+        return f"{self.student.email} - {self.level.code} ({self.get_status_display()})"
 
 
 class StudentUnit(TimeStampedModel):
@@ -651,7 +651,7 @@ class StudentUnit(TimeStampedModel):
         ordering = ['student', 'unit__level', 'unit__order']
     
     def __str__(self):
-        return f"{self.student.username} - {self.unit.title} ({self.get_status_display()})"
+        return f"{self.student.email} - {self.unit.title} ({self.get_status_display()})"
 
 
 class StudentLesson(TimeStampedModel):
@@ -689,7 +689,7 @@ class StudentLesson(TimeStampedModel):
     
     def __str__(self):
         status = "✓" if self.is_completed else "✗"
-        return f"{status} {self.student.username} - {self.lesson.title}"
+        return f"{status} {self.student.email} - {self.lesson.title}"
 
 
 class StudentUnitExamAttempt(TimeStampedModel):
@@ -782,7 +782,7 @@ class StudentUnitExamAttempt(TimeStampedModel):
     
     def __str__(self):
         status = "✓ Passed" if self.passed else "✗ Failed" if self.score is not None else "In Progress"
-        return f"{self.student.username} - {self.unit_exam.unit.title} - Attempt #{self.attempt_number} ({status})"
+        return f"{self.student.email} - {self.unit_exam.unit.title} - Attempt #{self.attempt_number} ({status})"
 
 
 class StudentLevelExamAttempt(TimeStampedModel):
@@ -857,7 +857,7 @@ class StudentLevelExamAttempt(TimeStampedModel):
     
     def __str__(self):
         status = "✓ Passed" if self.passed else "✗ Failed" if self.score is not None else "In Progress"
-        return f"{self.student.username} - {self.level_exam.level.code} Exam - Attempt #{self.attempt_number} ({status})"
+        return f"{self.student.email} - {self.level_exam.level.code} Exam - Attempt #{self.attempt_number} ({status})"
     
 # ============================================
 # ADD THIS TO THE END OF levels/models.py
