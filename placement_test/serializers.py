@@ -327,7 +327,7 @@ class ReadingQuestionSerializer(serializers.ModelSerializer):
     Serializer لعرض سؤال القراءة
     """
     passage_title = serializers.CharField(source='passage.title', read_only=True)
-    
+    passage = serializers.CharField(source='passage.passage_text', read_only=True)
     class Meta:
         model = ReadingQuestion
         fields = [
