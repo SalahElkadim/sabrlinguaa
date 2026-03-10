@@ -162,7 +162,7 @@ class StudentSTEPProgress(TimeStampedModel):
         ordering = ['student', 'skill']
     
     def __str__(self):
-        return f"{self.student.username} - {self.skill.title}"
+        return f"{self.student.email} - {self.skill.title}"
     
     def calculate_progress_percentage(self):
         """
@@ -229,4 +229,4 @@ class StudentSTEPQuestionView(TimeStampedModel):
         ]
     
     def __str__(self):
-        return f"{self.student.username} - {self.question_type} #{self.question_id}"
+        return f"{self.student.email} - {self.question_type} #{self.question_id}"
