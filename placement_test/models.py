@@ -415,7 +415,7 @@ class StudentPlacementTestAttempt(TimeStampedModel):
         ordering = ['-started_at']
     
     def __str__(self):
-        return f"{self.student.username} - {self.placement_test.title} - {self.started_at.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.student.email} - {self.placement_test.title} - {self.started_at.strftime('%Y-%m-%d %H:%M')}"
     
     def set_selected_questions(self, questions_dict):
         """
