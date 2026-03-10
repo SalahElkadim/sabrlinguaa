@@ -302,7 +302,7 @@ class EmailVerificationAdmin(admin.ModelAdmin):
                 '<span style="background:#10b981;color:#fff;padding:3px 10px;'
                 'border-radius:20px;font-size:11px;font-weight:600;">✓ تم التحقق</span>'
             )
-        elif obj.is_expired():
+        elif not obj.expires_at or obj.is_expired():
             return format_html(
                 '<span style="background:#ef4444;color:#fff;padding:3px 10px;'
                 'border-radius:20px;font-size:11px;font-weight:600;">✗ منتهي الصلاحية</span>'
