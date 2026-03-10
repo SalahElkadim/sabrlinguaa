@@ -579,7 +579,7 @@ class StudentPlacementTestAnswer(TimeStampedModel):
         unique_together = ['attempt', 'content_type', 'object_id']
     
     def __str__(self):
-        return f"{self.attempt.student.username} - Q{self.object_id} - {'✓' if self.is_correct else '✗'}"
+        return f"{self.attempt.student.email} - Q{self.object_id} - {'✓' if self.is_correct else '✗'}"
     
     def check_answer(self):
         """
