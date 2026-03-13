@@ -22,6 +22,7 @@ class TeacherListSerializer(serializers.ModelSerializer):
             'years_of_experience',
             'session_price',
             'is_active',
+            'bio',
         ]
 
     def get_profile_picture_url(self, obj):
