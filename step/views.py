@@ -400,7 +400,7 @@ def create_listening_audio(request):
             'audio': {
                 'id': audio.id,
                 'title': audio.title,
-                'audio_file': audio.audio_file.url if audio.audio_file else None,
+                'audio_file': str(audio.audio_file) if audio.audio_file else None,
                 'transcript': audio.transcript,
                 'duration': audio.duration,
                 'created_at': audio.created_at,
@@ -640,7 +640,7 @@ def get_skill_questions(request, skill_id):
             questions_data.append({
                 'id': audio.id, 'type': 'LISTENING',
                 'title': audio.title,
-                'audio_file': audio.audio_file.url if audio.audio_file else None,
+                'audio_file': str(audio.audio_file) if audio.audio_file else None,
                 'transcript': audio.transcript,
                 'duration': audio.duration,
                 'questions': audio_questions,
