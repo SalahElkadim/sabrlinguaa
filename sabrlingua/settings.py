@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'levels',
     'ielts',
     'step',
+    'booking',
 
 ]
 
@@ -112,9 +113,9 @@ ANYMAIL = {
     'BREVO_API_KEY': os.getenv('BREVO_API_KEY'),
 }
 
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'sm249481@gmail.com')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'sabrlingua@gmail.com')
 DEFAULT_FROM_NAME = os.getenv('DEFAULT_FROM_NAME', 'Sabr Learning Platform')
-
+COMPANY_EMAIL = os.getenv('COMPANY_EMAIL', 'sabrlingua@gmail.com')
 # Password Reset Configuration
 PASSWORD_RESET_TIMEOUT = int(os.getenv('PASSWORD_RESET_TIMEOUT', 3600))
 
