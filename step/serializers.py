@@ -14,9 +14,6 @@ User = get_user_model()
 # ============================================
 
 class STEPSkillListSerializer(serializers.ModelSerializer):
-    """
-    Serializer مبسط لقائمة المهارات
-    """
     total_questions = serializers.SerializerMethodField()
     
     class Meta:
@@ -36,9 +33,6 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
 
 
 class STEPSkillDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer تفصيلي للمهارة
-    """
     total_questions = serializers.SerializerMethodField()
     
     class Meta:
@@ -66,9 +60,6 @@ class STEPSkillDetailSerializer(serializers.ModelSerializer):
 # ============================================
 
 class StudentSTEPProgressSerializer(serializers.ModelSerializer):
-    """
-    Serializer لتقدم الطالب في مهارة
-    """
     skill_title = serializers.CharField(source='skill.title', read_only=True)
     skill_type = serializers.CharField(source='skill.skill_type', read_only=True)
     progress_percentage = serializers.SerializerMethodField()
@@ -99,9 +90,6 @@ class StudentSTEPProgressSerializer(serializers.ModelSerializer):
 
 
 class StudentSTEPQuestionViewSerializer(serializers.ModelSerializer):
-    """
-    Serializer لسجل الأسئلة المفتوحة
-    """
     skill_title = serializers.CharField(source='skill.title', read_only=True)
     
     class Meta:
@@ -119,13 +107,10 @@ class StudentSTEPQuestionViewSerializer(serializers.ModelSerializer):
 
 
 # ============================================
-# Question Serializers (لـ STEP)
+# Question Serializers
 # ============================================
 
 class VocabularyQuestionSTEPSerializer(serializers.Serializer):
-    """
-    Serializer لعرض سؤال Vocabulary مع الحل
-    """
     id = serializers.IntegerField()
     question_text = serializers.CharField()
     question_image = serializers.URLField(required=False, allow_null=True)
@@ -139,9 +124,6 @@ class VocabularyQuestionSTEPSerializer(serializers.Serializer):
 
 
 class GrammarQuestionSTEPSerializer(serializers.Serializer):
-    """
-    Serializer لعرض سؤال Grammar مع الحل
-    """
     id = serializers.IntegerField()
     question_text = serializers.CharField()
     question_image = serializers.URLField(required=False, allow_null=True)
@@ -155,9 +137,6 @@ class GrammarQuestionSTEPSerializer(serializers.Serializer):
 
 
 class ReadingQuestionSTEPSerializer(serializers.Serializer):
-    """
-    Serializer لعرض سؤال Reading مع الحل
-    """
     id = serializers.IntegerField()
     question_text = serializers.CharField()
     choice_a = serializers.CharField()
@@ -170,9 +149,6 @@ class ReadingQuestionSTEPSerializer(serializers.Serializer):
 
 
 class ReadingPassageSTEPSerializer(serializers.Serializer):
-    """
-    Serializer لعرض Reading Passage مع أسئلتها
-    """
     id = serializers.IntegerField()
     title = serializers.CharField()
     passage_text = serializers.CharField()
@@ -181,10 +157,36 @@ class ReadingPassageSTEPSerializer(serializers.Serializer):
     questions = ReadingQuestionSTEPSerializer(many=True)
 
 
+# ============================================
+# Listening Serializers ← جديد
+# ============================================
+
+class ListeningQuestionSTEPSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    question_text = serializers.CharField()
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
+
+
+class ListeningAudioSTEPSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    audio_file = serializers.URLField(required=False, allow_null=True)
+    transcript = serializers.CharField(required=False, allow_null=True)
+    duration = serializers.IntegerField(required=False, allow_null=True)
+    questions = ListeningQuestionSTEPSerializer(many=True)
+
+
+# ============================================
+# Writing Serializer
+# ============================================
+
 class WritingQuestionSTEPSerializer(serializers.Serializer):
-    """
-    Serializer لعرض سؤال Writing مع الحل
-    """
     id = serializers.IntegerField()
     title = serializers.CharField()
     question_text = serializers.CharField()

@@ -12,9 +12,6 @@ User = get_user_model()
 # ============================================
 
 class TimeStampedModel(models.Model):
-    """
-    نموذج أساسي للـ timestamps
-    """
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الإنشاء")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="تاريخ التحديث")
     
@@ -23,9 +20,6 @@ class TimeStampedModel(models.Model):
 
 
 class OrderedModel(models.Model):
-    """
-    نموذج أساسي للترتيب والتفعيل
-    """
     order = models.PositiveIntegerField(default=0, verbose_name="الترتيب")
     is_active = models.BooleanField(default=True, verbose_name="نشط")
     
@@ -40,12 +34,13 @@ class OrderedModel(models.Model):
 
 class STEPSkill(TimeStampedModel, OrderedModel):
     """
-    المهارات الأربعة في STEP: Reading, Writing, Vocabulary, Grammar
+    المهارات الخمس في STEP: Reading, Writing, Vocabulary, Grammar, Listening
     """
     SKILL_TYPE_CHOICES = [
         ('VOCABULARY', 'Vocabulary'),
         ('GRAMMAR', 'Grammar'),
         ('READING', 'Reading'),
+        ('LISTENING', 'Listening'),  # ← جديد
         ('WRITING', 'Writing'),
     ]
     
@@ -77,14 +72,12 @@ class STEPSkill(TimeStampedModel, OrderedModel):
         return f"{self.get_skill_type_display()}"
     
     def get_total_questions_count(self):
-        """
-        عدد جميع الأسئلة في هذه المهارة
-        """
         from sabr_questions.models import (
             VocabularyQuestion,
             GrammarQuestion,
             ReadingPassage,
-            WritingQuestion
+            WritingQuestion,
+            ListeningAudio,
         )
         
         skill_type = self.skill_type
@@ -114,6 +107,17 @@ class STEPSkill(TimeStampedModel, OrderedModel):
                 total += passage.get_questions_count()
             return total
         
+        elif skill_type == 'LISTENING':  # ← جديد
+            audios = ListeningAudio.objects.filter(
+                step_skill=self,
+                usage_type='STEP',
+                is_active=True
+            )
+            total = 0
+            for audio in audios:
+                total += audio.questions.filter(is_active=True).count()
+            return total
+        
         elif skill_type == 'WRITING':
             return WritingQuestion.objects.filter(
                 step_skill=self,
@@ -129,9 +133,6 @@ class STEPSkill(TimeStampedModel, OrderedModel):
 # ============================================
 
 class StudentSTEPProgress(TimeStampedModel):
-    """
-    تقدم الطالب في مهارة معينة
-    """
     student = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -144,8 +145,6 @@ class StudentSTEPProgress(TimeStampedModel):
         related_name='student_progress',
         verbose_name="المهارة"
     )
-    
-    # Statistics
     viewed_questions_count = models.PositiveIntegerField(
         default=0,
         verbose_name="عدد الأسئلة المفتوحة"
@@ -165,33 +164,24 @@ class StudentSTEPProgress(TimeStampedModel):
         return f"{self.student.email} - {self.skill.title}"
     
     def calculate_progress_percentage(self):
-        """
-        حساب نسبة التقدم (%)
-        """
         total_questions = self.skill.get_total_questions_count()
         if total_questions == 0:
             return 0
-        
         percentage = (self.viewed_questions_count / total_questions) * 100
         return round(percentage, 2)
     
     def increment_score(self):
-        """
-        زيادة النقاط والأسئلة المفتوحة
-        """
         self.viewed_questions_count += 1
         self.total_score += 1
         self.save()
 
 
 class StudentSTEPQuestionView(TimeStampedModel):
-    """
-    سجل الأسئلة التي فتحها الطالب (unique per student)
-    """
     QUESTION_TYPE_CHOICES = [
         ('VOCABULARY', 'Vocabulary'),
         ('GRAMMAR', 'Grammar'),
         ('READING', 'Reading'),
+        ('LISTENING', 'Listening'),  # ← جديد
         ('WRITING', 'Writing'),
     ]
     
@@ -207,15 +197,12 @@ class StudentSTEPQuestionView(TimeStampedModel):
         related_name='question_views',
         verbose_name="المهارة"
     )
-    
     question_type = models.CharField(
         max_length=20,
         choices=QUESTION_TYPE_CHOICES,
         verbose_name="نوع السؤال"
     )
     question_id = models.PositiveIntegerField(verbose_name="رقم السؤال")
-    
-    # Meta
     viewed_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الفتح")
     
     class Meta:
