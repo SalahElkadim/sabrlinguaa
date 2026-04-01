@@ -167,6 +167,7 @@ def create_vocabulary_question(request):
             step_skill=skill,
             is_active=data.get('is_active', True),
             order=0,
+            difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
         return Response({
@@ -232,6 +233,7 @@ def create_grammar_question(request):
             step_skill=skill,
             is_active=data.get('is_active', True),
             order=0,
+            difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
         return Response({
@@ -270,6 +272,7 @@ def create_reading_passage(request):
             'step_skill': skill,
             'is_active': data.get('is_active', True),
             'order': 0,
+            'difficulty': data.get('difficulty', 'MEDIUM'),
         }
         if 'source' in data:
             passage_data['source'] = data.get('source')
@@ -334,6 +337,7 @@ def create_reading_question(request, passage_id):
             points=data.get('points', 1),
             is_active=data.get('is_active', True),
             order=0,
+            difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
         return Response({
@@ -393,6 +397,7 @@ def create_listening_audio(request):
             step_skill=skill,
             order=int(data.get('order', 0)),
             is_active=data.get('is_active', True),
+            difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
         return Response({
@@ -521,6 +526,7 @@ def create_writing_question(request):
             'points': data.get('points', 10),
             'is_active': data.get('is_active', True),
             'order': 0,
+            'difficulty': data.get('difficulty', 'MEDIUM'),
         }
         if 'question_image' in data and data.get('question_image'):
             question_data['question_image'] = data.get('question_image')
@@ -577,6 +583,7 @@ def get_skill_questions(request, skill_id):
                 'choice_c': q.choice_c, 'choice_d': q.choice_d,
                 'correct_answer': q.correct_answer,
                 'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
             })
 
     elif skill.skill_type == 'GRAMMAR':
@@ -594,6 +601,7 @@ def get_skill_questions(request, skill_id):
                 'choice_c': q.choice_c, 'choice_d': q.choice_d,
                 'correct_answer': q.correct_answer,
                 'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
             })
 
     elif skill.skill_type == 'READING':
@@ -619,6 +627,7 @@ def get_skill_questions(request, skill_id):
                 'passage_image': passage.passage_image.url if passage.passage_image else None,
                 'source': passage.source,
                 'questions': passage_questions,
+                'difficulty': passage.difficulty,
             })
 
     elif skill.skill_type == 'LISTENING':  # ← جديد
@@ -644,6 +653,7 @@ def get_skill_questions(request, skill_id):
                 'transcript': audio.transcript,
                 'duration': audio.duration,
                 'questions': audio_questions,
+                'difficulty': audio.difficulty,
             })
 
     elif skill.skill_type == 'WRITING':
@@ -660,6 +670,7 @@ def get_skill_questions(request, skill_id):
                 'min_words': q.min_words, 'max_words': q.max_words,
                 'sample_answer': q.sample_answer, 'rubric': q.rubric,
                 'points': q.points,
+                'difficulty': q.difficulty,
             })
 
     return Response({
@@ -942,7 +953,8 @@ def update_reading_passage(request, passage_id):
             passage.source = data['source']
         if 'is_active' in data:
             passage.is_active = data['is_active']
-
+        if 'difficulty' in data:
+            passage.difficulty = data['difficulty']
         passage.save()
         return Response({
             'message': 'تم تحديث القطعة بنجاح',
@@ -1049,6 +1061,8 @@ def update_listening_audio(request, audio_id):
             audio.duration = int(data['duration'])
         if 'is_active' in data:
             audio.is_active = data['is_active']
+        if 'difficulty' in data:
+            audio .difficulty = data['difficulty']
 
         audio.save()
         return Response({
@@ -1160,6 +1174,8 @@ def update_writing_question(request, question_id):
             question.rubric = data['rubric']
         if 'is_active' in data:
             question.is_active = data['is_active']
+        if 'difficulty' in data:
+            question.difficulty = data['difficulty']
 
         if question.max_words <= question.min_words:
             return Response({'error': 'الحد الأقصى للكلمات يجب أن يكون أكبر من الحد الأدنى'}, status=status.HTTP_400_BAD_REQUEST)

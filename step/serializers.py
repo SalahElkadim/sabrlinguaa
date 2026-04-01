@@ -112,6 +112,7 @@ class StudentSTEPQuestionViewSerializer(serializers.ModelSerializer):
 
 class VocabularyQuestionSTEPSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
     question_text = serializers.CharField()
     question_image = serializers.URLField(required=False, allow_null=True)
     choice_a = serializers.CharField()
@@ -125,6 +126,7 @@ class VocabularyQuestionSTEPSerializer(serializers.Serializer):
 
 class GrammarQuestionSTEPSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
     question_text = serializers.CharField()
     question_image = serializers.URLField(required=False, allow_null=True)
     choice_a = serializers.CharField()
@@ -138,6 +140,7 @@ class GrammarQuestionSTEPSerializer(serializers.Serializer):
 
 class ReadingQuestionSTEPSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
     question_text = serializers.CharField()
     choice_a = serializers.CharField()
     choice_b = serializers.CharField()
@@ -155,6 +158,7 @@ class ReadingPassageSTEPSerializer(serializers.Serializer):
     passage_image = serializers.URLField(required=False, allow_null=True)
     source = serializers.CharField(required=False, allow_null=True)
     questions = ReadingQuestionSTEPSerializer(many=True)
+    difficulty = serializers.CharField(required=False)  
 
 
 # ============================================
@@ -163,6 +167,7 @@ class ReadingPassageSTEPSerializer(serializers.Serializer):
 
 class ListeningQuestionSTEPSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
     question_text = serializers.CharField()
     choice_a = serializers.CharField()
     choice_b = serializers.CharField()
@@ -180,6 +185,7 @@ class ListeningAudioSTEPSerializer(serializers.Serializer):
     transcript = serializers.CharField(required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
     questions = ListeningQuestionSTEPSerializer(many=True)
+    difficulty = serializers.CharField(required=False)  
 
 
 # ============================================
@@ -196,3 +202,4 @@ class WritingQuestionSTEPSerializer(serializers.Serializer):
     sample_answer = serializers.CharField(required=False, allow_null=True)
     rubric = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)  

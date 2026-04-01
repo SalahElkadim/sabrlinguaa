@@ -30,7 +30,32 @@ class OrderedModel(models.Model):
         ordering = ['order', 'id']
 
 
-class BaseMCQQuestion(models.Model):
+# ============================================
+# Difficulty Mixin
+# ============================================
+
+class DifficultyMixin(models.Model):
+    """
+    Mixin لإضافة مستوى الصعوبة
+    """
+    DIFFICULTY_CHOICES = [
+        ('EASY', 'سهل'),
+        ('MEDIUM', 'متوسط'),
+        ('HARD', 'صعب'),
+    ]
+    difficulty = models.CharField(
+        max_length=10,
+        choices=DIFFICULTY_CHOICES,
+        default='MEDIUM',
+        verbose_name="مستوى الصعوبة",
+        db_index=True
+    )
+
+    class Meta:
+        abstract = True
+
+
+class BaseMCQQuestion(DifficultyMixin, models.Model):
     """
     نموذج أساسي لأسئلة الاختيار من متعدد
     """
@@ -178,8 +203,6 @@ class UsageTypeMixin(models.Model):
     
     class Meta:
         abstract = True
-
-    
 
 
 # ============================================
@@ -352,7 +375,7 @@ class GrammarQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel, UsageType
 # Reading Questions (أسئلة القراءة)
 # ============================================
 
-class ReadingPassage(TimeStampedModel, OrderedModel, UsageTypeMixin):
+class ReadingPassage(TimeStampedModel, OrderedModel, UsageTypeMixin, DifficultyMixin):
     """
     قطعة القراءة
     """
@@ -435,7 +458,7 @@ class ReadingQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel):
 # Listening Questions (أسئلة الاستماع)
 # ============================================
 
-class ListeningAudio(TimeStampedModel, OrderedModel, UsageTypeMixin):
+class ListeningAudio(TimeStampedModel, OrderedModel, UsageTypeMixin, DifficultyMixin):
     """
     التسجيل الصوتي
     """
@@ -519,7 +542,7 @@ class ListeningQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel):
 # Speaking Questions (أسئلة التحدث)
 # ============================================
 
-class SpeakingVideo(TimeStampedModel, OrderedModel, UsageTypeMixin):
+class SpeakingVideo(TimeStampedModel, OrderedModel, UsageTypeMixin, DifficultyMixin):
     """
     الفيديو التعليمي
     """
@@ -610,7 +633,7 @@ class SpeakingQuestion(BaseMCQQuestion, TimeStampedModel, OrderedModel):
 # Writing Questions (أسئلة الكتابة)
 # ============================================
 
-class WritingQuestion(TimeStampedModel, OrderedModel, UsageTypeMixin):
+class WritingQuestion(TimeStampedModel, OrderedModel, UsageTypeMixin, DifficultyMixin):
     """
     سؤال كتابة
     """
