@@ -47,7 +47,6 @@ class STEPSkill(TimeStampedModel, OrderedModel):
     skill_type = models.CharField(
         max_length=20,
         choices=SKILL_TYPE_CHOICES,
-        unique=True,
         verbose_name="نوع المهارة"
     )
     title = models.CharField(max_length=200, verbose_name="العنوان")
