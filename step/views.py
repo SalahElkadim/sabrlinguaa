@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.core.paginator import Paginator
-
+from django.db.models import Case, When, IntegerField, Value
 from .models import (
     STEPSkill,
     StudentSTEPProgress,
@@ -549,6 +549,17 @@ def create_writing_question(request):
 # 3. QUESTIONS DISPLAY (للطالب)
 # ============================================
 
+
+# Helper لترتيب الصعوبة: EASY=1, MEDIUM=2, HARD=3
+DIFFICULTY_ORDER = Case(
+    When(difficulty='EASY', then=Value(1)),
+    When(difficulty='MEDIUM', then=Value(2)),
+    When(difficulty='HARD', then=Value(3)),
+    default=Value(2),
+    output_field=IntegerField()
+)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_skill_questions(request, skill_id):
@@ -571,7 +582,8 @@ def get_skill_questions(request, skill_id):
     if skill.skill_type == 'VOCABULARY':
         questions = VocabularyQuestion.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        ).order_by('order', 'id')
+        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
+        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -589,7 +601,8 @@ def get_skill_questions(request, skill_id):
     elif skill.skill_type == 'GRAMMAR':
         questions = GrammarQuestion.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        ).order_by('order', 'id')
+        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
+        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -607,11 +620,14 @@ def get_skill_questions(request, skill_id):
     elif skill.skill_type == 'READING':
         passages = ReadingPassage.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        ).prefetch_related('questions').order_by('order', 'id')
+        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
+        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(passages, page_size)
         page_obj = paginator.get_page(page)
         for passage in page_obj:
             passage_questions = []
+            # ملاحظة: أسئلة الـ passage محتفظة بترتيبها الطبيعي (order, id)
+            # لأنها مرتبطة بتسلسل النص ومش منطقي نكسر ترتيبها
             for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
                 passage_questions.append({
                     'id': q.id, 'question_text': q.question_text,
@@ -630,14 +646,17 @@ def get_skill_questions(request, skill_id):
                 'difficulty': passage.difficulty,
             })
 
-    elif skill.skill_type == 'LISTENING':  # ← جديد
+    elif skill.skill_type == 'LISTENING':
         audios = ListeningAudio.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        ).prefetch_related('questions').order_by('order', 'id')
+        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
+        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(audios, page_size)
         page_obj = paginator.get_page(page)
         for audio in page_obj:
             audio_questions = []
+            # ملاحظة: أسئلة الـ audio محتفظة بترتيبها الطبيعي (order, id)
+            # لأنها مرتبطة بتسلسل التسجيل الصوتي ومش منطقي نكسر ترتيبها
             for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
                 audio_questions.append({
                     'id': q.id, 'question_text': q.question_text,
@@ -659,7 +678,8 @@ def get_skill_questions(request, skill_id):
     elif skill.skill_type == 'WRITING':
         questions = WritingQuestion.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        ).order_by('order', 'id')
+        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
+        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -687,7 +707,6 @@ def get_skill_questions(request, skill_id):
         },
         'questions': questions_data
     }, status=status.HTTP_200_OK)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
