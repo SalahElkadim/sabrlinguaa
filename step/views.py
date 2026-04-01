@@ -738,10 +738,10 @@ def mark_question_viewed(request, skill_id, question_type, question_id):
                 progress, _ = StudentSTEPProgress.objects.get_or_create(
                     student=student, skill=skill
                 )
-                progress.increment_score()
+                progress.increment_score()  # هيبقى +10 تلقائياً
                 return Response({
-                    'message': 'تم تسجيل فتح السؤال وإضافة نقطة',
-                    'points_earned': 1,
+                    'message': 'تم اجتياز السؤال',
+                    'points_earned': 10,  # ✅ غير من 1 لـ 10
                     'total_score': progress.total_score,
                     'progress_percentage': progress.calculate_progress_percentage()
                 }, status=status.HTTP_201_CREATED)
@@ -1224,3 +1224,71 @@ def delete_writing_question(request, question_id):
     question = get_object_or_404(WritingQuestion, id=question_id, usage_type='STEP')
     question.delete()
     return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_writing_answer(request, question_id):
+    """
+    POST /api/step/writing/questions/{question_id}/submit/
+    Body: { "student_answer": "..." }
+    """
+    from sabr_questions.models import WritingQuestion
+    from placement_test.services.ai_grading import AIGradingService
+    import json
+
+    question = get_object_or_404(WritingQuestion, id=question_id, usage_type='STEP')
+    student_answer = request.data.get('student_answer', '').strip()
+
+    if not student_answer:
+        return Response(
+            {'error': 'الإجابة مطلوبة'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # التحقق من عدد الكلمات
+    word_count = len(student_answer.split())
+    if word_count < question.min_words:
+        return Response({
+            'error': f'الإجابة قصيرة جداً، الحد الأدنى {question.min_words} كلمة',
+            'word_count': word_count,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if word_count > question.max_words:
+        return Response({
+            'error': f'الإجابة طويلة جداً، الحد الأقصى {question.max_words} كلمة',
+            'word_count': word_count,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        # ✅ نفس الـ AIGradingService الموجود بالظبط
+        grading_service = AIGradingService()
+
+        grading_result = grading_service.grade_writing_question(
+            question_text=question.question_text,
+            student_answer=student_answer,
+            sample_answer=question.sample_answer or '',
+            rubric=question.rubric or '',
+            max_points=10,          # دايماً من 10 في الـ STEP
+            min_words=question.min_words,
+            max_words=question.max_words,
+            pass_threshold=60       # مش بنستخدمه لكن مطلوب للـ service
+        )
+
+        return Response({
+            # ✅ النتيجة من 10 (raw_score مش binary)
+            'score': grading_result.get('raw_score', 0),
+            'percentage': grading_result.get('percentage', 0),
+            'feedback': grading_result.get('feedback', ''),
+            'strengths': grading_result.get('strengths', []),
+            'improvements': grading_result.get('improvements', []),
+            'word_count': word_count,
+            # ✅ إشارة للـ frontend إنه يظهر زرار "تم المراجعة"
+            'can_mark_as_viewed': True,
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error getting AI feedback for STEP writing: {str(e)}")
+        return Response(
+            {'error': 'حدث خطأ أثناء تقييم الإجابة، حاول مرة أخرى'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

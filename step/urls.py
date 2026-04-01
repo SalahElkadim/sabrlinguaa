@@ -51,4 +51,5 @@ urlpatterns = [
 
     path('writing/questions/<int:question_id>/update/', views.update_writing_question, name='update-writing-question'),
     path('writing/questions/<int:question_id>/delete/', views.delete_writing_question, name='delete-writing-question'),
+    path('step/writing/questions/<int:question_id>/submit/',views.submit_writing_answer,name='step-submit-writing'),
 ]

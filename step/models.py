@@ -169,9 +169,9 @@ class StudentSTEPProgress(TimeStampedModel):
         percentage = (self.viewed_questions_count / total_questions) * 100
         return round(percentage, 2)
     
-    def increment_score(self):
+    def increment_score(self, points=10):  # ✅ default 10
+        self.total_score += points
         self.viewed_questions_count += 1
-        self.total_score += 1
         self.save()
 
 
