@@ -789,3 +789,400 @@ def skill_progress(request, skill_id):
             'progress_percentage': 0,
             'total_score': 0,
         }, status=status.HTTP_200_OK)
+
+# ============================================
+# 5. UPDATE & DELETE QUESTIONS
+# ============================================
+
+def _map_options_to_letters(options, correct_answer):
+    """Helper: يحول الخيارات والإجابة الصحيحة لحروف A/B/C/D"""
+    correct_letter = None
+    for idx, option in enumerate(options):
+        if option == correct_answer:
+            correct_letter = chr(65 + idx)
+            break
+    return correct_letter
+
+
+# --- Vocabulary ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_vocabulary_question(request, question_id):
+    """
+    PUT/PATCH /api/step/vocabulary/<question_id>/update/
+    """
+    from sabr_questions.models import VocabularyQuestion
+
+    question = get_object_or_404(VocabularyQuestion, id=question_id, usage_type='STEP')
+    data = request.data.copy()
+
+    try:
+        if 'options' in data and 'correct_answer' in data:
+            options = data.get('options', [])
+            correct_letter = _map_options_to_letters(options, data.get('correct_answer'))
+            if not correct_letter:
+                return Response({'correct_answer': 'الإجابة الصحيحة غير موجودة في الخيارات'}, status=status.HTTP_400_BAD_REQUEST)
+            question.choice_a = options[0] if len(options) > 0 else question.choice_a
+            question.choice_b = options[1] if len(options) > 1 else question.choice_b
+            question.choice_c = options[2] if len(options) > 2 else question.choice_c
+            question.choice_d = options[3] if len(options) > 3 else question.choice_d
+            question.correct_answer = correct_letter
+
+        if 'question_text' in data:
+            question.question_text = data['question_text']
+        if 'explanation' in data:
+            question.explanation = data['explanation']
+        if 'points' in data:
+            question.points = data['points']
+        if 'is_active' in data:
+            question.is_active = data['is_active']
+
+        question.save()
+        return Response({
+            'message': 'تم تحديث السؤال بنجاح',
+            'question': {'id': question.id, 'question_text': question.question_text}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating vocabulary question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_vocabulary_question(request, question_id):
+    """
+    DELETE /api/step/vocabulary/<question_id>/delete/
+    """
+    from sabr_questions.models import VocabularyQuestion
+
+    question = get_object_or_404(VocabularyQuestion, id=question_id, usage_type='STEP')
+    question.delete()
+    return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
+
+
+# --- Grammar ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_grammar_question(request, question_id):
+    """
+    PUT/PATCH /api/step/grammar/<question_id>/update/
+    """
+    from sabr_questions.models import GrammarQuestion
+
+    question = get_object_or_404(GrammarQuestion, id=question_id, usage_type='STEP')
+    data = request.data.copy()
+
+    try:
+        if 'options' in data and 'correct_answer' in data:
+            options = data.get('options', [])
+            correct_letter = _map_options_to_letters(options, data.get('correct_answer'))
+            if not correct_letter:
+                return Response({'correct_answer': 'الإجابة الصحيحة غير موجودة في الخيارات'}, status=status.HTTP_400_BAD_REQUEST)
+            question.choice_a = options[0] if len(options) > 0 else question.choice_a
+            question.choice_b = options[1] if len(options) > 1 else question.choice_b
+            question.choice_c = options[2] if len(options) > 2 else question.choice_c
+            question.choice_d = options[3] if len(options) > 3 else question.choice_d
+            question.correct_answer = correct_letter
+
+        if 'question_text' in data:
+            question.question_text = data['question_text']
+        if 'explanation' in data:
+            question.explanation = data['explanation']
+        if 'points' in data:
+            question.points = data['points']
+        if 'is_active' in data:
+            question.is_active = data['is_active']
+
+        question.save()
+        return Response({
+            'message': 'تم تحديث السؤال بنجاح',
+            'question': {'id': question.id, 'question_text': question.question_text}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating grammar question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_grammar_question(request, question_id):
+    """
+    DELETE /api/step/grammar/<question_id>/delete/
+    """
+    from sabr_questions.models import GrammarQuestion
+
+    question = get_object_or_404(GrammarQuestion, id=question_id, usage_type='STEP')
+    question.delete()
+    return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
+
+
+# --- Reading Passage ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_reading_passage(request, passage_id):
+    """
+    PUT/PATCH /api/step/reading/passages/<passage_id>/update/
+    """
+    from sabr_questions.models import ReadingPassage
+
+    passage = get_object_or_404(ReadingPassage, id=passage_id, usage_type='STEP')
+    data = request.data.copy()
+
+    try:
+        if 'title' in data:
+            passage.title = data['title']
+        if 'passage_text' in data:
+            passage.passage_text = data['passage_text']
+        if 'source' in data:
+            passage.source = data['source']
+        if 'is_active' in data:
+            passage.is_active = data['is_active']
+
+        passage.save()
+        return Response({
+            'message': 'تم تحديث القطعة بنجاح',
+            'passage': {'id': passage.id, 'title': passage.title}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating reading passage: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_reading_passage(request, passage_id):
+    """
+    DELETE /api/step/reading/passages/<passage_id>/delete/
+    """
+    from sabr_questions.models import ReadingPassage
+
+    passage = get_object_or_404(ReadingPassage, id=passage_id, usage_type='STEP')
+    passage.delete()
+    return Response({'message': 'تم حذف القطعة وأسئلتها بنجاح', 'passage_id': passage_id}, status=status.HTTP_200_OK)
+
+
+# --- Reading Question ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_reading_question(request, question_id):
+    """
+    PUT/PATCH /api/step/reading/questions/<question_id>/update/
+    """
+    from sabr_questions.models import ReadingQuestion
+
+    question = get_object_or_404(ReadingQuestion, id=question_id)
+    data = request.data.copy()
+
+    try:
+        if 'options' in data and 'correct_answer' in data:
+            options = data.get('options', [])
+            correct_letter = _map_options_to_letters(options, data.get('correct_answer'))
+            if not correct_letter:
+                return Response({'correct_answer': 'الإجابة الصحيحة غير موجودة في الخيارات'}, status=status.HTTP_400_BAD_REQUEST)
+            question.choice_a = options[0] if len(options) > 0 else question.choice_a
+            question.choice_b = options[1] if len(options) > 1 else question.choice_b
+            question.choice_c = options[2] if len(options) > 2 else question.choice_c
+            question.choice_d = options[3] if len(options) > 3 else question.choice_d
+            question.correct_answer = correct_letter
+
+        if 'question_text' in data:
+            question.question_text = data['question_text']
+        if 'explanation' in data:
+            question.explanation = data['explanation']
+        if 'points' in data:
+            question.points = data['points']
+        if 'is_active' in data:
+            question.is_active = data['is_active']
+
+        question.save()
+        return Response({
+            'message': 'تم تحديث السؤال بنجاح',
+            'question': {'id': question.id, 'question_text': question.question_text}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating reading question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_reading_question(request, question_id):
+    """
+    DELETE /api/step/reading/questions/<question_id>/delete/
+    """
+    from sabr_questions.models import ReadingQuestion
+
+    question = get_object_or_404(ReadingQuestion, id=question_id)
+    question.delete()
+    return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
+
+
+# --- Listening Audio ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_listening_audio(request, audio_id):
+    """
+    PUT/PATCH /api/step/listening/audio/<audio_id>/update/
+    """
+    from sabr_questions.models import ListeningAudio
+
+    audio = get_object_or_404(ListeningAudio, id=audio_id, usage_type='STEP')
+    data = request.data.copy()
+
+    try:
+        if 'title' in data:
+            audio.title = data['title']
+        if 'audio_file' in data:
+            audio.audio_file = data['audio_file']
+        if 'transcript' in data:
+            audio.transcript = data['transcript']
+        if 'duration' in data:
+            audio.duration = int(data['duration'])
+        if 'is_active' in data:
+            audio.is_active = data['is_active']
+
+        audio.save()
+        return Response({
+            'message': 'تم تحديث التسجيل الصوتي بنجاح',
+            'audio': {'id': audio.id, 'title': audio.title}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating listening audio: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_listening_audio(request, audio_id):
+    """
+    DELETE /api/step/listening/audio/<audio_id>/delete/
+    """
+    from sabr_questions.models import ListeningAudio
+
+    audio = get_object_or_404(ListeningAudio, id=audio_id, usage_type='STEP')
+    audio.delete()
+    return Response({'message': 'تم حذف التسجيل الصوتي وأسئلته بنجاح', 'audio_id': audio_id}, status=status.HTTP_200_OK)
+
+
+# --- Listening Question ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_listening_question(request, question_id):
+    """
+    PUT/PATCH /api/step/listening/questions/<question_id>/update/
+    """
+    from sabr_questions.models import ListeningQuestion
+
+    question = get_object_or_404(ListeningQuestion, id=question_id)
+    data = request.data.copy()
+
+    try:
+        if 'options' in data and 'correct_answer' in data:
+            options = data.get('options', [])
+            correct_letter = _map_options_to_letters(options, data.get('correct_answer'))
+            if not correct_letter:
+                return Response({'correct_answer': 'الإجابة الصحيحة غير موجودة في الخيارات'}, status=status.HTTP_400_BAD_REQUEST)
+            question.choice_a = options[0] if len(options) > 0 else question.choice_a
+            question.choice_b = options[1] if len(options) > 1 else question.choice_b
+            question.choice_c = options[2] if len(options) > 2 else question.choice_c
+            question.choice_d = options[3] if len(options) > 3 else question.choice_d
+            question.correct_answer = correct_letter
+
+        if 'question_text' in data:
+            question.question_text = data['question_text']
+        if 'explanation' in data:
+            question.explanation = data['explanation']
+        if 'points' in data:
+            question.points = data['points']
+        if 'is_active' in data:
+            question.is_active = data['is_active']
+
+        question.save()
+        return Response({
+            'message': 'تم تحديث السؤال بنجاح',
+            'question': {'id': question.id, 'question_text': question.question_text}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating listening question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_listening_question(request, question_id):
+    """
+    DELETE /api/step/listening/questions/<question_id>/delete/
+    """
+    from sabr_questions.models import ListeningQuestion
+
+    question = get_object_or_404(ListeningQuestion, id=question_id)
+    question.delete()
+    return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
+
+
+# --- Writing ---
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_writing_question(request, question_id):
+    """
+    PUT/PATCH /api/step/writing/questions/<question_id>/update/
+    """
+    from sabr_questions.models import WritingQuestion
+
+    question = get_object_or_404(WritingQuestion, id=question_id, usage_type='STEP')
+    data = request.data.copy()
+
+    try:
+        if 'title' in data:
+            question.title = data['title']
+        if 'question_text' in data:
+            question.question_text = data['question_text']
+        if 'min_words' in data:
+            question.min_words = int(data['min_words'])
+        if 'max_words' in data:
+            question.max_words = int(data['max_words'])
+        if 'sample_answer' in data:
+            question.sample_answer = data['sample_answer']
+        if 'rubric' in data:
+            question.rubric = data['rubric']
+        if 'is_active' in data:
+            question.is_active = data['is_active']
+
+        if question.max_words <= question.min_words:
+            return Response({'error': 'الحد الأقصى للكلمات يجب أن يكون أكبر من الحد الأدنى'}, status=status.HTTP_400_BAD_REQUEST)
+
+        question.save()
+        return Response({
+            'message': 'تم تحديث السؤال بنجاح',
+            'question': {'id': question.id, 'title': question.title}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating writing question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_writing_question(request, question_id):
+    """
+    DELETE /api/step/writing/questions/<question_id>/delete/
+    """
+    from sabr_questions.models import WritingQuestion
+
+    question = get_object_or_404(WritingQuestion, id=question_id, usage_type='STEP')
+    question.delete()
+    return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
