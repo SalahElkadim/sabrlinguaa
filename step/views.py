@@ -867,6 +867,8 @@ def update_vocabulary_question(request, question_id):
             question.points = data['points']
         if 'is_active' in data:
             question.is_active = data['is_active']
+        if 'difficulty' in data:
+            question.difficulty = data['difficulty']
 
         question.save()
         return Response({
@@ -925,7 +927,8 @@ def update_grammar_question(request, question_id):
             question.points = data['points']
         if 'is_active' in data:
             question.is_active = data['is_active']
-
+        if 'difficulty' in data:
+            question.difficulty = data['difficulty']
         question.save()
         return Response({
             'message': 'تم تحديث السؤال بنجاح',
