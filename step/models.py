@@ -1,3 +1,5 @@
+# models.py
+
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth import get_user_model
@@ -33,14 +35,11 @@ class OrderedModel(models.Model):
 # ============================================
 
 class STEPSkill(TimeStampedModel, OrderedModel):
-    """
-    المهارات الخمس في STEP: Reading, Writing, Vocabulary, Grammar, Listening
-    """
     SKILL_TYPE_CHOICES = [
         ('VOCABULARY', 'Vocabulary'),
         ('GRAMMAR', 'Grammar'),
         ('READING', 'Reading'),
-        ('LISTENING', 'Listening'),  # ← جديد
+        ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
     ]
     
@@ -50,11 +49,7 @@ class STEPSkill(TimeStampedModel, OrderedModel):
         verbose_name="نوع المهارة"
     )
     title = models.CharField(max_length=200, verbose_name="العنوان")
-    description = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="الوصف"
-    )
+    description = models.TextField(blank=True, null=True, verbose_name="الوصف")
     icon = CloudinaryField(
         verbose_name="الأيقونة",
         blank=True,
@@ -72,58 +67,32 @@ class STEPSkill(TimeStampedModel, OrderedModel):
     
     def get_total_questions_count(self):
         from sabr_questions.models import (
-            VocabularyQuestion,
-            GrammarQuestion,
-            ReadingPassage,
-            WritingQuestion,
-            ListeningAudio,
+            VocabularyQuestion, GrammarQuestion,
+            ReadingPassage, WritingQuestion, ListeningAudio,
         )
-        
         skill_type = self.skill_type
-        
         if skill_type == 'VOCABULARY':
             return VocabularyQuestion.objects.filter(
-                step_skill=self,
-                usage_type='STEP',
-                is_active=True
+                step_skill=self, usage_type='STEP', is_active=True
             ).count()
-        
         elif skill_type == 'GRAMMAR':
             return GrammarQuestion.objects.filter(
-                step_skill=self,
-                usage_type='STEP',
-                is_active=True
+                step_skill=self, usage_type='STEP', is_active=True
             ).count()
-        
         elif skill_type == 'READING':
             passages = ReadingPassage.objects.filter(
-                step_skill=self,
-                usage_type='STEP',
-                is_active=True
+                step_skill=self, usage_type='STEP', is_active=True
             )
-            total = 0
-            for passage in passages:
-                total += passage.get_questions_count()
-            return total
-        
-        elif skill_type == 'LISTENING':  # ← جديد
+            return sum(p.get_questions_count() for p in passages)
+        elif skill_type == 'LISTENING':
             audios = ListeningAudio.objects.filter(
-                step_skill=self,
-                usage_type='STEP',
-                is_active=True
+                step_skill=self, usage_type='STEP', is_active=True
             )
-            total = 0
-            for audio in audios:
-                total += audio.questions.filter(is_active=True).count()
-            return total
-        
+            return sum(a.questions.filter(is_active=True).count() for a in audios)
         elif skill_type == 'WRITING':
             return WritingQuestion.objects.filter(
-                step_skill=self,
-                usage_type='STEP',
-                is_active=True
+                step_skill=self, usage_type='STEP', is_active=True
             ).count()
-        
         return 0
 
 
@@ -133,24 +102,18 @@ class STEPSkill(TimeStampedModel, OrderedModel):
 
 class StudentSTEPProgress(TimeStampedModel):
     student = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='step_progress',
-        verbose_name="الطالب"
+        User, on_delete=models.CASCADE,
+        related_name='step_progress', verbose_name="الطالب"
     )
     skill = models.ForeignKey(
-        STEPSkill,
-        on_delete=models.CASCADE,
-        related_name='student_progress',
-        verbose_name="المهارة"
+        STEPSkill, on_delete=models.CASCADE,
+        related_name='student_progress', verbose_name="المهارة"
     )
     viewed_questions_count = models.PositiveIntegerField(
-        default=0,
-        verbose_name="عدد الأسئلة المفتوحة"
+        default=0, verbose_name="عدد الأسئلة المكتملة"
     )
     total_score = models.PositiveIntegerField(
-        default=0,
-        verbose_name="إجمالي النقاط"
+        default=0, verbose_name="إجمالي النقاط"
     )
     
     class Meta:
@@ -166,40 +129,101 @@ class StudentSTEPProgress(TimeStampedModel):
         total_questions = self.skill.get_total_questions_count()
         if total_questions == 0:
             return 0
-        percentage = (self.viewed_questions_count / total_questions) * 100
-        return round(percentage, 2)
+        return round((self.viewed_questions_count / total_questions) * 100, 2)
     
-    def increment_score(self, points=10):  # ✅ default 10
+    def add_score(self, points):
+        """يضيف نقاط ويزود عداد الأسئلة المكتملة"""
         self.total_score += points
         self.viewed_questions_count += 1
         self.save()
 
 
+class StudentSTEPQuestionAttempt(TimeStampedModel):
+    """
+    يسجل كل محاولة للإجابة على سؤال معين.
+    يحفظ عدد المحاولات، النقاط المكتسبة، وهل استخدم show answer.
+    """
+    QUESTION_TYPE_CHOICES = [
+        ('VOCABULARY', 'Vocabulary'),
+        ('GRAMMAR', 'Grammar'),
+        ('READING', 'Reading'),
+        ('LISTENING', 'Listening'),
+        ('WRITING', 'Writing'),
+    ]
+
+    student = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='step_question_attempts', verbose_name="الطالب"
+    )
+    skill = models.ForeignKey(
+        STEPSkill, on_delete=models.CASCADE,
+        related_name='question_attempts', verbose_name="المهارة"
+    )
+    question_type = models.CharField(
+        max_length=20, choices=QUESTION_TYPE_CHOICES, verbose_name="نوع السؤال"
+    )
+    question_id = models.PositiveIntegerField(verbose_name="رقم السؤال")
+
+    attempts_count = models.PositiveIntegerField(
+        default=0, verbose_name="عدد المحاولات"
+    )
+    is_solved = models.BooleanField(
+        default=False, verbose_name="تم الحل (إجابة صحيحة أو show answer)"
+    )
+    points_earned = models.PositiveIntegerField(
+        default=0, verbose_name="النقاط المكتسبة"
+    )
+    used_show_answer = models.BooleanField(
+        default=False, verbose_name="استخدم show answer"
+    )
+    solved_at = models.DateTimeField(
+        null=True, blank=True, verbose_name="وقت الحل"
+    )
+
+    class Meta:
+        verbose_name = "Student STEP Question Attempt"
+        verbose_name_plural = "Student STEP Question Attempts"
+        # كل سؤال له record واحد بس per student
+        unique_together = ['student', 'question_type', 'question_id']
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['student', 'skill']),
+            models.Index(fields=['question_type', 'question_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.student.email} - {self.question_type} #{self.question_id} - attempts: {self.attempts_count}"
+
+    def get_points_for_attempt(self):
+        """
+        يحسب النقاط بناءً على عدد المحاولات الحالية:
+        محاولة 1 → 20، محاولة 2 → 15، محاولة 3 → 10، محاولة 4+ → 5
+        """
+        points_map = {1: 20, 2: 15, 3: 10}
+        return points_map.get(self.attempts_count, 5)
+
+
+# نحتفظ بـ StudentSTEPQuestionView للـ backward compatibility
+# لكن مش هنستخدمه في النظام الجديد
 class StudentSTEPQuestionView(TimeStampedModel):
     QUESTION_TYPE_CHOICES = [
         ('VOCABULARY', 'Vocabulary'),
         ('GRAMMAR', 'Grammar'),
         ('READING', 'Reading'),
-        ('LISTENING', 'Listening'),  # ← جديد
+        ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
     ]
     
     student = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='step_question_views',
-        verbose_name="الطالب"
+        User, on_delete=models.CASCADE,
+        related_name='step_question_views', verbose_name="الطالب"
     )
     skill = models.ForeignKey(
-        STEPSkill,
-        on_delete=models.CASCADE,
-        related_name='question_views',
-        verbose_name="المهارة"
+        STEPSkill, on_delete=models.CASCADE,
+        related_name='question_views', verbose_name="المهارة"
     )
     question_type = models.CharField(
-        max_length=20,
-        choices=QUESTION_TYPE_CHOICES,
-        verbose_name="نوع السؤال"
+        max_length=20, choices=QUESTION_TYPE_CHOICES, verbose_name="نوع السؤال"
     )
     question_id = models.PositiveIntegerField(verbose_name="رقم السؤال")
     viewed_at = models.DateTimeField(auto_now_add=True, verbose_name="تاريخ الفتح")

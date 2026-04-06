@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 
-app_name = 'step'  # ← ضيف السطر ده
+app_name = 'step'
 
 urlpatterns = [
     # SKILLS
@@ -16,40 +16,53 @@ urlpatterns = [
     path('grammar/create/', views.create_grammar_question, name='create-grammar-question'),
     path('reading/passages/create/', views.create_reading_passage, name='create-reading-passage'),
     path('reading/passages/<int:passage_id>/questions/create/', views.create_reading_question, name='create-reading-question'),
-    
-    # ← جديد Listening
     path('listening/audio/create/', views.create_listening_audio, name='create-listening-audio'),
     path('listening/audio/<int:audio_id>/questions/create/', views.create_listening_question, name='create-listening-question'),
-    
     path('writing/questions/create/', views.create_writing_question, name='create-writing-question'),
 
     # QUESTIONS DISPLAY
     path('skills/<int:skill_id>/questions/', views.get_skill_questions, name='get-skill-questions'),
-    path('skills/<int:skill_id>/questions/<str:question_type>/<int:question_id>/mark-viewed/', views.mark_question_viewed, name='mark-question-viewed'),
+
+    # ============================================
+    # نظام المحاولات الجديد
+    # ============================================
+    # إرسال إجابة MCQ (Vocabulary, Grammar, Reading, Listening)
+    path(
+        'skills/<int:skill_id>/questions/<str:question_type>/<int:question_id>/submit/',
+        views.submit_mcq_answer,
+        name='submit-mcq-answer'
+    ),
+    # Show Answer
+    path(
+        'skills/<int:skill_id>/questions/<str:question_type>/<int:question_id>/show-answer/',
+        views.use_show_answer,
+        name='use-show-answer'
+    ),
+    # حالة المحاولات (للـ frontend)
+    path(
+        'skills/<int:skill_id>/questions/<str:question_type>/<int:question_id>/attempt-status/',
+        views.get_question_attempt_status,
+        name='question-attempt-status'
+    ),
 
     # PROGRESS
     path('my-progress/', views.my_progress, name='my-progress'),
     path('skills/<int:skill_id>/my-progress/', views.skill_progress, name='skill-progress'),
 
-    #update, Delete 
     # UPDATE & DELETE
     path('vocabulary/<int:question_id>/update/', views.update_vocabulary_question, name='update-vocabulary-question'),
     path('vocabulary/<int:question_id>/delete/', views.delete_vocabulary_question, name='delete-vocabulary-question'),
-
     path('grammar/<int:question_id>/update/', views.update_grammar_question, name='update-grammar-question'),
     path('grammar/<int:question_id>/delete/', views.delete_grammar_question, name='delete-grammar-question'),
-
     path('reading/passages/<int:passage_id>/update/', views.update_reading_passage, name='update-reading-passage'),
     path('reading/passages/<int:passage_id>/delete/', views.delete_reading_passage, name='delete-reading-passage'),
     path('reading/questions/<int:question_id>/update/', views.update_reading_question, name='update-reading-question'),
     path('reading/questions/<int:question_id>/delete/', views.delete_reading_question, name='delete-reading-question'),
-
     path('listening/audio/<int:audio_id>/update/', views.update_listening_audio, name='update-listening-audio'),
     path('listening/audio/<int:audio_id>/delete/', views.delete_listening_audio, name='delete-listening-audio'),
     path('listening/questions/<int:question_id>/update/', views.update_listening_question, name='update-listening-question'),
     path('listening/questions/<int:question_id>/delete/', views.delete_listening_question, name='delete-listening-question'),
-
     path('writing/questions/<int:question_id>/update/', views.update_writing_question, name='update-writing-question'),
     path('writing/questions/<int:question_id>/delete/', views.delete_writing_question, name='delete-writing-question'),
-    path('writing/questions/<int:question_id>/submit/',views.submit_writing_answer,name='step-submit-writing'),
+    path('writing/questions/<int:question_id>/submit/', views.submit_writing_answer, name='step-submit-writing'),
 ]

@@ -10,7 +10,7 @@ from django.db.models import Case, When, IntegerField, Value
 from .models import (
     STEPSkill,
     StudentSTEPProgress,
-    StudentSTEPQuestionView,
+    StudentSTEPQuestionView,StudentSTEPQuestionAttempt
 )
 
 from .serializers import (
@@ -1292,3 +1292,356 @@ def submit_writing_answer(request, question_id):
             {'error': 'حدث خطأ أثناء تقييم الإجابة، حاول مرة أخرى'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# ============================================
+# نظام المحاولات الجديد
+# ============================================
+
+# نقاط المحاولات
+ATTEMPT_POINTS = {1: 20, 2: 15, 3: 10}
+SHOW_ANSWER_POINTS = 5
+MAX_ATTEMPTS_POINTS = 5  # محاولة 4 أو أكتر
+
+
+def _get_correct_answer_text(question_type, question_id):
+    """
+    Helper: يجيب نص الإجابة الصحيحة من السؤال
+    بيرجع dict فيه correct_answer و explanation
+    """
+    from sabr_questions.models import (
+        VocabularyQuestion, GrammarQuestion,
+        ReadingQuestion, ListeningQuestion, WritingQuestion,
+    )
+
+    model_map = {
+        'VOCABULARY': VocabularyQuestion,
+        'GRAMMAR': GrammarQuestion,
+        'READING': ReadingQuestion,
+        'LISTENING': ListeningQuestion,
+    }
+
+    if question_type == 'WRITING':
+        q = get_object_or_404(WritingQuestion, id=question_id, usage_type='STEP')
+        return {
+            'sample_answer': q.sample_answer,
+            'rubric': q.rubric,
+        }
+
+    model = model_map.get(question_type)
+    if not model:
+        return {}
+
+    q = get_object_or_404(model, id=question_id)
+
+    # نحول الحرف (A/B/C/D) لنص الإجابة
+    choice_map = {
+        'A': q.choice_a, 'B': q.choice_b,
+        'C': q.choice_c, 'D': q.choice_d,
+    }
+    correct_text = choice_map.get(q.correct_answer, '')
+
+    return {
+        'correct_answer_letter': q.correct_answer,
+        'correct_answer_text': correct_text,
+        'explanation': q.explanation,
+    }
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_mcq_answer(request, skill_id, question_type, question_id):
+    """
+    POST /api/step/skills/{skill_id}/questions/{question_type}/{question_id}/submit/
+
+    يستقبل إجابة الطالب على سؤال MCQ ويحسب النقاط حسب عدد المحاولات.
+
+    Body: { "selected_answer": "A" }  ← حرف الإجابة (A/B/C/D)
+
+    Response:
+    {
+        "is_correct": true/false,
+        "attempts_count": 2,
+        "points_earned": 0,        ← 0 لو غلط، النقاط لو صح
+        "total_points_this_question": 15,  ← النقاط المكتسبة من السؤال ده
+        "total_score": 150,
+        "progress_percentage": 45.5,
+        "correct_answer": "B",     ← بس لو خلص محاولاته (4 محاولات غلط)
+        "message": "..."
+    }
+    """
+    from sabr_questions.models import (
+        VocabularyQuestion, GrammarQuestion,
+        ReadingQuestion, ListeningQuestion,
+    )
+
+    skill = get_object_or_404(STEPSkill, id=skill_id)
+    student = request.user
+
+    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING']
+    if question_type not in valid_types:
+        return Response(
+            {'error': f'استخدم هذا الـ endpoint للأنواع: {", ".join(valid_types)} فقط'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    selected_answer = request.data.get('selected_answer', '').strip().upper()
+    if not selected_answer:
+        return Response(
+            {'error': 'selected_answer مطلوب (A/B/C/D)'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # نجيب الإجابة الصحيحة من الـ model المناسب
+    model_map = {
+        'VOCABULARY': VocabularyQuestion,
+        'GRAMMAR': GrammarQuestion,
+        'READING': ReadingQuestion,
+        'LISTENING': ListeningQuestion,
+    }
+    model = model_map[question_type]
+    question = get_object_or_404(model, id=question_id)
+    correct_answer = question.correct_answer  # حرف A/B/C/D
+
+    try:
+        with transaction.atomic():
+            # نجيب أو ننشئ record للمحاولة
+            attempt, created = StudentSTEPQuestionAttempt.objects.get_or_create(
+                student=student,
+                question_type=question_type,
+                question_id=question_id,
+                defaults={'skill': skill}
+            )
+
+            # لو السؤال اتحل قبل كده (صح أو show answer) → ارفض
+            if attempt.is_solved:
+                progress, _ = StudentSTEPProgress.objects.get_or_create(
+                    student=student, skill=skill
+                )
+                return Response({
+                    'message': 'هذا السؤال تم حله من قبل ولا يمكن كسب نقاط إضافية منه',
+                    'is_correct': selected_answer == correct_answer,
+                    'attempts_count': attempt.attempts_count,
+                    'total_points_this_question': attempt.points_earned,
+                    'total_score': progress.total_score,
+                    'progress_percentage': progress.calculate_progress_percentage(),
+                    'already_solved': True,
+                }, status=status.HTTP_200_OK)
+
+            # زود عداد المحاولات
+            attempt.attempts_count += 1
+            attempt.save()
+
+            is_correct = (selected_answer == correct_answer)
+            progress, _ = StudentSTEPProgress.objects.get_or_create(
+                student=student, skill=skill
+            )
+
+            if is_correct:
+                # احسب النقاط حسب عدد المحاولات
+                points = ATTEMPT_POINTS.get(attempt.attempts_count, MAX_ATTEMPTS_POINTS)
+                attempt.is_solved = True
+                attempt.points_earned = points
+                attempt.solved_at = timezone.now()
+                attempt.save()
+
+                # زود التقدم
+                progress.add_score(points)
+
+                return Response({
+                    'is_correct': True,
+                    'attempts_count': attempt.attempts_count,
+                    'points_earned': points,
+                    'total_points_this_question': points,
+                    'total_score': progress.total_score,
+                    'progress_percentage': progress.calculate_progress_percentage(),
+                    'message': f'إجابة صحيحة! حصلت على {points} نقطة',
+                }, status=status.HTTP_200_OK)
+
+            else:
+                # إجابة غلط
+                # لو وصل المحاولة الرابعة → انتهى، 0 نقاط، نكشف الإجابة
+                if attempt.attempts_count >= 4:
+                    attempt.is_solved = True
+                    attempt.points_earned = 0
+                    attempt.solved_at = timezone.now()
+                    attempt.save()
+
+                    # نزود viewed_questions_count بس مش نقاط
+                    progress.viewed_questions_count += 1
+                    progress.save()
+
+                    # نجيب الإجابة الصحيحة نصاً
+                    choice_map = {
+                        'A': question.choice_a, 'B': question.choice_b,
+                        'C': question.choice_c, 'D': question.choice_d,
+                    }
+                    return Response({
+                        'is_correct': False,
+                        'attempts_count': attempt.attempts_count,
+                        'points_earned': 0,
+                        'total_points_this_question': 0,
+                        'total_score': progress.total_score,
+                        'progress_percentage': progress.calculate_progress_percentage(),
+                        'message': 'انتهت محاولاتك. الإجابة الصحيحة هي:',
+                        'correct_answer_letter': correct_answer,
+                        'correct_answer_text': choice_map.get(correct_answer, ''),
+                        'explanation': question.explanation,
+                        'max_attempts_reached': True,
+                    }, status=status.HTTP_200_OK)
+
+                # لسه في محاولات
+                remaining = 4 - attempt.attempts_count
+                return Response({
+                    'is_correct': False,
+                    'attempts_count': attempt.attempts_count,
+                    'points_earned': 0,
+                    'total_points_this_question': 0,
+                    'total_score': progress.total_score,
+                    'progress_percentage': progress.calculate_progress_percentage(),
+                    'message': f'إجابة خاطئة. لديك {remaining} محاولة متبقية',
+                    'remaining_attempts': remaining,
+                    'next_attempt_points': ATTEMPT_POINTS.get(attempt.attempts_count + 1, MAX_ATTEMPTS_POINTS),
+                }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error in submit_mcq_answer: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def use_show_answer(request, skill_id, question_type, question_id):
+    """
+    POST /api/step/skills/{skill_id}/questions/{question_type}/{question_id}/show-answer/
+
+    لما الطالب يضغط "Show Answer":
+    - لو السؤال لم يُحل بعد → يكسب 5 نقاط ويتعلم الإجابة
+    - لو السؤال اتحل قبل كده → يشوف الإجابة بس من غير نقاط
+
+    Response:
+    {
+        "points_earned": 5,         ← أو 0 لو اتحل قبل
+        "total_score": 155,
+        "correct_answer_letter": "B",
+        "correct_answer_text": "...",
+        "explanation": "...",
+        "message": "..."
+    }
+    """
+    from sabr_questions.models import (
+        VocabularyQuestion, GrammarQuestion,
+        ReadingQuestion, ListeningQuestion, WritingQuestion,
+    )
+
+    skill = get_object_or_404(STEPSkill, id=skill_id)
+    student = request.user
+
+    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'WRITING']
+    if question_type not in valid_types:
+        return Response(
+            {'error': f'نوع السؤال غير صحيح'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        with transaction.atomic():
+            attempt, created = StudentSTEPQuestionAttempt.objects.get_or_create(
+                student=student,
+                question_type=question_type,
+                question_id=question_id,
+                defaults={'skill': skill}
+            )
+
+            progress, _ = StudentSTEPProgress.objects.get_or_create(
+                student=student, skill=skill
+            )
+
+            # نجيب الإجابة الصحيحة
+            answer_data = _get_correct_answer_text(question_type, question_id)
+
+            # لو السؤال اتحل قبل كده → بس نكشف الإجابة من غير نقاط
+            if attempt.is_solved:
+                return Response({
+                    'message': 'تم حل هذا السؤال من قبل',
+                    'points_earned': 0,
+                    'already_solved': True,
+                    'total_score': progress.total_score,
+                    'progress_percentage': progress.calculate_progress_percentage(),
+                    **answer_data,
+                }, status=status.HTTP_200_OK)
+
+            # أول مرة يضغط show answer → 5 نقاط
+            attempt.is_solved = True
+            attempt.used_show_answer = True
+            attempt.points_earned = SHOW_ANSWER_POINTS
+            attempt.solved_at = timezone.now()
+            attempt.save()
+
+            progress.add_score(SHOW_ANSWER_POINTS)
+
+            return Response({
+                'message': f'حصلت على {SHOW_ANSWER_POINTS} نقاط',
+                'points_earned': SHOW_ANSWER_POINTS,
+                'already_solved': False,
+                'total_score': progress.total_score,
+                'progress_percentage': progress.calculate_progress_percentage(),
+                **answer_data,
+            }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        logger.error(f"Error in use_show_answer: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_question_attempt_status(request, skill_id, question_type, question_id):
+    """
+    GET /api/step/skills/{skill_id}/questions/{question_type}/{question_id}/attempt-status/
+
+    يجيب حالة محاولات الطالب على سؤال معين.
+    مفيد للـ frontend عشان يعرف يعرض كام محاولة اتعملت.
+
+    Response:
+    {
+        "has_attempted": true,
+        "attempts_count": 2,
+        "is_solved": false,
+        "points_earned": 0,
+        "used_show_answer": false,
+        "remaining_attempts": 2,
+        "next_attempt_points": 10
+    }
+    """
+    skill = get_object_or_404(STEPSkill, id=skill_id)
+    student = request.user
+
+    try:
+        attempt = StudentSTEPQuestionAttempt.objects.get(
+            student=student,
+            question_type=question_type,
+            question_id=question_id,
+        )
+        remaining = max(0, 4 - attempt.attempts_count) if not attempt.is_solved else 0
+        next_points = ATTEMPT_POINTS.get(attempt.attempts_count + 1, MAX_ATTEMPTS_POINTS) if not attempt.is_solved else 0
+
+        return Response({
+            'has_attempted': True,
+            'attempts_count': attempt.attempts_count,
+            'is_solved': attempt.is_solved,
+            'points_earned': attempt.points_earned,
+            'used_show_answer': attempt.used_show_answer,
+            'remaining_attempts': remaining,
+            'next_attempt_points': next_points,
+        }, status=status.HTTP_200_OK)
+
+    except StudentSTEPQuestionAttempt.DoesNotExist:
+        return Response({
+            'has_attempted': False,
+            'attempts_count': 0,
+            'is_solved': False,
+            'points_earned': 0,
+            'used_show_answer': False,
+            'remaining_attempts': 4,
+            'next_attempt_points': 20,  # أول محاولة = 20 نقطة
+        }, status=status.HTTP_200_OK)
