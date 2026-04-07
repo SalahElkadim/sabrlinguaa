@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from cloudinary.models import CloudinaryField
+from sabr_questions.models import SpeakingVideo
 
 User = get_user_model()
 
@@ -41,7 +42,8 @@ class STEPSkill(TimeStampedModel, OrderedModel):
         ('READING', 'Reading'),
         ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
-        ('GENERAL_PATH', 'المسار العام'),  # ← جديد
+        ('GENERAL_PATH', 'General path'), 
+        ('SPEAKING', 'Speaking'),
 
     ]
     
@@ -113,7 +115,14 @@ class STEPSkill(TimeStampedModel, OrderedModel):
             total += sum(p.get_questions_count() for p in passages)
             audios = ListeningAudio.objects.filter(step_skill=self, usage_type='STEP', is_active=True)
             total += sum(a.questions.filter(is_active=True).count() for a in audios)
+            videos = SpeakingVideo.objects.filter(step_skill=self, usage_type='STEP', is_active=True)
+            total += sum(v.questions.filter(is_active=True).count() for v in videos)
             return total
+        elif skill_type == 'SPEAKING':
+            videos = SpeakingVideo.objects.filter(
+                step_skill=self, usage_type='STEP', is_active=True
+            )
+            return sum(v.questions.filter(is_active=True).count() for v in videos)
         return 0
 
 
@@ -170,6 +179,7 @@ class StudentSTEPQuestionAttempt(TimeStampedModel):
         ('READING', 'Reading'),
         ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
+        ('SPEAKING', 'Speaking'),
     ]
 
     student = models.ForeignKey(
@@ -233,6 +243,8 @@ class StudentSTEPQuestionView(TimeStampedModel):
         ('READING', 'Reading'),
         ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
+        ('SPEAKING', 'Speaking'),
+
     ]
     
     student = models.ForeignKey(

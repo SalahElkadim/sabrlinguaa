@@ -66,4 +66,11 @@ urlpatterns = [
     path('writing/questions/<int:question_id>/delete/', views.delete_writing_question, name='delete-writing-question'),
     path('writing/questions/<int:question_id>/submit/', views.submit_writing_answer, name='step-submit-writing'),
     path('skills/<int:skill_id>/set-children/', views.set_child_skills, name='set-child-skills'),
+
+    path('speaking/videos/create/', views.create_speaking_video, name='create-speaking-video'),
+    path('speaking/videos/<int:video_id>/questions/create/', views.create_speaking_question, name='create-speaking-question'),
+    path('speaking/videos/<int:video_id>/update/', views.update_speaking_video, name='update-speaking-video'),
+    path('speaking/videos/<int:video_id>/delete/', views.delete_speaking_video, name='delete-speaking-video'),
+    path('speaking/questions/<int:question_id>/update/', views.update_speaking_question, name='update-speaking-question'),
+    path('speaking/questions/<int:question_id>/delete/', views.delete_speaking_question, name='delete-speaking-question'),
 ]

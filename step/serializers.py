@@ -212,3 +212,28 @@ class WritingQuestionSTEPSerializer(serializers.Serializer):
     rubric = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
     difficulty = serializers.CharField(required=False)  
+
+# SPEAKING
+
+class SpeakingQuestionSTEPSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    question_text = serializers.CharField()
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
+
+
+class SpeakingVideoSTEPSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    video_file = serializers.URLField(required=False, allow_null=True)
+    description = serializers.CharField(required=False, allow_null=True)
+    duration = serializers.IntegerField(required=False, allow_null=True)
+    thumbnail = serializers.URLField(required=False, allow_null=True)
+    questions = SpeakingQuestionSTEPSerializer(many=True)
+    difficulty = serializers.CharField(required=False)

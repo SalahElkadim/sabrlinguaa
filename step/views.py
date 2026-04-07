@@ -12,6 +12,7 @@ from .models import (
     StudentSTEPProgress,
     StudentSTEPQuestionView,StudentSTEPQuestionAttempt
 )
+from sabr_questions.models import SpeakingVideo
 
 from .serializers import (
     STEPSkillListSerializer,
@@ -710,6 +711,34 @@ def get_skill_questions(request, skill_id):
                 'questions': audio_questions,
                 'difficulty': audio.difficulty,
             })
+    elif skill.skill_type == 'SPEAKING':
+
+        videos = SpeakingVideo.objects.filter(
+            step_skill=skill, usage_type='STEP', is_active=True
+        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        paginator = Paginator(videos, page_size)
+        page_obj = paginator.get_page(page)
+        for video in page_obj:
+            video_questions = []
+            for q in video.questions.filter(is_active=True).order_by('order', 'id'):
+                video_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('SPEAKING', q.id),
+                })
+            questions_data.append({
+                'id': video.id, 'type': 'SPEAKING',
+                'title': video.title,
+                'video_file': str(video.video_file) if video.video_file else None,
+                'thumbnail': str(video.thumbnail) if video.thumbnail else None,
+                'description': video.description,
+                'duration': video.duration,
+                'questions': video_questions,
+                'difficulty': video.difficulty,
+            })
 
     elif skill.skill_type == 'WRITING':
         questions = WritingQuestion.objects.filter(
@@ -804,7 +833,29 @@ def get_skill_questions(request, skill_id):
                 'questions': passage_questions,
                 'difficulty': passage.difficulty,
             })
-
+        # Speaking
+        videos = SpeakingVideo.objects.filter(step_skill=skill, usage_type='STEP', is_active=True).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        for video in videos:
+            video_questions = []
+            for q in video.questions.filter(is_active=True).order_by('order', 'id'):
+                video_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('SPEAKING', q.id),
+                })
+            questions_data.append({
+                'id': video.id, 'type': 'SPEAKING',
+                'title': video.title,
+                'video_file': str(video.video_file) if video.video_file else None,
+                'thumbnail': str(video.thumbnail) if video.thumbnail else None,
+                'description': video.description,
+                'duration': video.duration,
+                'questions': video_questions,
+                'difficulty': video.difficulty,
+            })
         # Listening
         audios = ListeningAudio.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
@@ -881,7 +932,7 @@ def mark_question_viewed(request, skill_id, question_type, question_id):
     skill = get_object_or_404(STEPSkill, id=skill_id)
     student = request.user
 
-    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'WRITING']  # ← أضفنا LISTENING
+    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'WRITING','SPEAKING']  # ← أضفنا LISTENING
     if question_type not in valid_types:
         return Response(
             {'error': f'نوع السؤال غير صحيح. يجب أن يكون أحد: {", ".join(valid_types)}'},
@@ -1499,7 +1550,7 @@ def _get_correct_answer_text(question_type, question_id):
     """
     from sabr_questions.models import (
         VocabularyQuestion, GrammarQuestion,
-        ReadingQuestion, ListeningQuestion, WritingQuestion,
+        ReadingQuestion, ListeningQuestion, WritingQuestion,SpeakingQuestion
     )
 
     model_map = {
@@ -1507,6 +1558,7 @@ def _get_correct_answer_text(question_type, question_id):
         'GRAMMAR': GrammarQuestion,
         'READING': ReadingQuestion,
         'LISTENING': ListeningQuestion,
+        'SPEAKING': SpeakingQuestion,
     }
 
     if question_type == 'WRITING':
@@ -1560,13 +1612,13 @@ def submit_mcq_answer(request, skill_id, question_type, question_id):
     """
     from sabr_questions.models import (
         VocabularyQuestion, GrammarQuestion,
-        ReadingQuestion, ListeningQuestion,
+        ReadingQuestion, ListeningQuestion,SpeakingQuestion
     )
 
     skill = get_object_or_404(STEPSkill, id=skill_id)
     student = request.user
 
-    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING']
+    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING']
     if question_type not in valid_types:
         return Response(
             {'error': f'استخدم هذا الـ endpoint للأنواع: {", ".join(valid_types)} فقط'},
@@ -1586,6 +1638,7 @@ def submit_mcq_answer(request, skill_id, question_type, question_id):
         'GRAMMAR': GrammarQuestion,
         'READING': ReadingQuestion,
         'LISTENING': ListeningQuestion,
+        'SPEAKING': SpeakingQuestion,
     }
     model = model_map[question_type]
     question = get_object_or_404(model, id=question_id)
@@ -1725,7 +1778,7 @@ def use_show_answer(request, skill_id, question_type, question_id):
     skill = get_object_or_404(STEPSkill, id=skill_id)
     student = request.user
 
-    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'WRITING']
+    valid_types = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'WRITING', 'SPEAKING']
     if question_type not in valid_types:
         return Response(
             {'error': f'نوع السؤال غير صحيح'},
@@ -1869,3 +1922,224 @@ def set_child_skills(request, skill_id):
         'message': 'تم تحديث المهارات الفرعية بنجاح',
         'child_skills': [{'id': c.id, 'title': c.title, 'skill_type': c.skill_type} for c in children]
     }, status=status.HTTP_200_OK)
+
+# ============================================
+# SPEAKING VIEWS
+# ============================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_speaking_video(request):
+    """
+    POST /api/step/speaking/videos/create/
+    """
+    from sabr_questions.models import SpeakingVideo
+
+    data = request.data.copy()
+    required_fields = ['title', 'video_file', 'step_skill']
+    for field in required_fields:
+        if field not in data:
+            return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        skill = get_object_or_404(STEPSkill, id=data.get('step_skill'))
+        if skill.skill_type not in ['SPEAKING', 'GENERAL_PATH']:
+            return Response(
+                {'error': 'هذه المهارة ليست من نوع Speaking'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        video = SpeakingVideo.objects.create(
+            title=data.get('title'),
+            video_file=data.get('video_file'),
+            description=data.get('description', ''),
+            duration=int(data.get('duration', 0)),
+            usage_type='STEP',
+            step_skill=skill,
+            order=int(data.get('order', 0)),
+            is_active=data.get('is_active', True),
+            difficulty=data.get('difficulty', 'MEDIUM'),
+        )
+
+        return Response({
+            'message': 'تم إنشاء الفيديو بنجاح',
+            'video': {
+                'id': video.id,
+                'title': video.title,
+                'video_file': str(video.video_file) if video.video_file else None,
+                'description': video.description,
+                'duration': video.duration,
+                'created_at': video.created_at,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        logger.error(f"Error creating STEP speaking video: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_speaking_question(request, video_id):
+    """
+    POST /api/step/speaking/videos/{video_id}/questions/create/
+    """
+    from sabr_questions.models import SpeakingVideo, SpeakingQuestion
+
+    try:
+        video = SpeakingVideo.objects.get(id=video_id, usage_type='STEP')
+    except SpeakingVideo.DoesNotExist:
+        return Response({'error': 'الفيديو غير موجود'}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data.copy()
+    required_fields = ['question_text', 'options', 'correct_answer']
+    for field in required_fields:
+        if field not in data:
+            return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        options = data.get('options', [])
+        if len(options) < 2:
+            return Response({'options': 'يجب إضافة خيارين على الأقل'}, status=status.HTTP_400_BAD_REQUEST)
+
+        correct_answer = data.get('correct_answer')
+        correct_letter = None
+        for idx, option in enumerate(options):
+            if option == correct_answer:
+                correct_letter = chr(65 + idx)
+                break
+
+        if not correct_letter:
+            return Response({'correct_answer': 'الإجابة الصحيحة غير موجودة في الخيارات'}, status=status.HTTP_400_BAD_REQUEST)
+
+        question = SpeakingQuestion.objects.create(
+            video=video,
+            question_text=data.get('question_text'),
+            choice_a=options[0] if len(options) > 0 else '',
+            choice_b=options[1] if len(options) > 1 else '',
+            choice_c=options[2] if len(options) > 2 else '',
+            choice_d=options[3] if len(options) > 3 else '',
+            correct_answer=correct_letter,
+            explanation=data.get('explanation', ''),
+            points=data.get('points', 1),
+            order=int(data.get('order', 0)),
+            is_active=data.get('is_active', True),
+        )
+
+        return Response({
+            'message': 'تم إنشاء السؤال بنجاح',
+            'question': {
+                'id': question.id,
+                'question_text': question.question_text,
+                'created_at': question.created_at,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        logger.error(f"Error creating STEP speaking question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_speaking_video(request, video_id):
+    """
+    PUT/PATCH /api/step/speaking/videos/{video_id}/update/
+    """
+    from sabr_questions.models import SpeakingVideo
+
+    video = get_object_or_404(SpeakingVideo, id=video_id, usage_type='STEP')
+    data = request.data.copy()
+
+    try:
+        if 'title' in data:
+            video.title = data['title']
+        if 'video_file' in data:
+            video.video_file = data['video_file']
+        if 'description' in data:
+            video.description = data['description']
+        if 'duration' in data:
+            video.duration = int(data['duration'])
+        if 'is_active' in data:
+            video.is_active = data['is_active']
+        if 'difficulty' in data:
+            video.difficulty = data['difficulty']
+
+        video.save()
+        return Response({
+            'message': 'تم تحديث الفيديو بنجاح',
+            'video': {'id': video.id, 'title': video.title}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating speaking video: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_speaking_video(request, video_id):
+    """
+    DELETE /api/step/speaking/videos/{video_id}/delete/
+    """
+    from sabr_questions.models import SpeakingVideo
+
+    video = get_object_or_404(SpeakingVideo, id=video_id, usage_type='STEP')
+    video.delete()
+    return Response({'message': 'تم حذف الفيديو وأسئلته بنجاح', 'video_id': video_id}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_speaking_question(request, question_id):
+    """
+    PUT/PATCH /api/step/speaking/questions/{question_id}/update/
+    """
+    from sabr_questions.models import SpeakingQuestion
+
+    question = get_object_or_404(SpeakingQuestion, id=question_id)
+    data = request.data.copy()
+
+    try:
+        if 'options' in data and 'correct_answer' in data:
+            options = data.get('options', [])
+            correct_letter = _map_options_to_letters(options, data.get('correct_answer'))
+            if not correct_letter:
+                return Response({'correct_answer': 'الإجابة الصحيحة غير موجودة في الخيارات'}, status=status.HTTP_400_BAD_REQUEST)
+            question.choice_a = options[0] if len(options) > 0 else question.choice_a
+            question.choice_b = options[1] if len(options) > 1 else question.choice_b
+            question.choice_c = options[2] if len(options) > 2 else question.choice_c
+            question.choice_d = options[3] if len(options) > 3 else question.choice_d
+            question.correct_answer = correct_letter
+
+        if 'question_text' in data:
+            question.question_text = data['question_text']
+        if 'explanation' in data:
+            question.explanation = data['explanation']
+        if 'points' in data:
+            question.points = data['points']
+        if 'is_active' in data:
+            question.is_active = data['is_active']
+
+        question.save()
+        return Response({
+            'message': 'تم تحديث السؤال بنجاح',
+            'question': {'id': question.id, 'question_text': question.question_text}
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error updating speaking question: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_speaking_question(request, question_id):
+    """
+    DELETE /api/step/speaking/questions/{question_id}/delete/
+    """
+    from sabr_questions.models import SpeakingQuestion
+
+    question = get_object_or_404(SpeakingQuestion, id=question_id)
+    question.delete()
+    return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
