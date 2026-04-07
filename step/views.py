@@ -262,7 +262,7 @@ def create_reading_passage(request):
 
     try:
         skill = get_object_or_404(STEPSkill, id=data.get('step_skill'))
-        if skill.skill_type != 'READING':
+        if skill.skill_type not in ['READING', 'GENERAL_PATH']:
             return Response({'error': 'هذه المهارة ليست من نوع Reading'}, status=status.HTTP_400_BAD_REQUEST)
 
         passage_data = {
@@ -382,7 +382,7 @@ def create_listening_audio(request):
 
     try:
         skill = get_object_or_404(STEPSkill, id=data.get('step_skill'))
-        if skill.skill_type != 'LISTENING':
+        if skill.skill_type not in ['LISTENING', 'GENERAL_PATH']:
             return Response(
                 {'error': 'هذه المهارة ليست من نوع Listening'},
                 status=status.HTTP_400_BAD_REQUEST
