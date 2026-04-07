@@ -699,99 +699,86 @@ def get_skill_questions(request, skill_id):
             ReadingPassage, ListeningAudio,
         )
 
-        child_skills = skill.child_skills.filter(is_active=True).order_by('order')
+        # Vocabulary
+        vocab_qs = VocabularyQuestion.objects.filter(
+            step_skill=skill, usage_type='STEP', is_active=True
+        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+        for q in vocab_qs:
+            questions_data.append({
+                'id': q.id, 'type': 'VOCABULARY',
+                'question_text': q.question_text,
+                'question_image': q.question_image.url if q.question_image else None,
+                'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                'correct_answer': q.correct_answer,
+                'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
+            })
 
-        for child_skill in child_skills:
+        # Grammar
+        grammar_qs = GrammarQuestion.objects.filter(
+            step_skill=skill, usage_type='STEP', is_active=True
+        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+        for q in grammar_qs:
+            questions_data.append({
+                'id': q.id, 'type': 'GRAMMAR',
+                'question_text': q.question_text,
+                'question_image': q.question_image.url if q.question_image else None,
+                'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                'correct_answer': q.correct_answer,
+                'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
+            })
 
-            if child_skill.skill_type == 'VOCABULARY':
-                qs = VocabularyQuestion.objects.filter(
-                    step_skill=child_skill, usage_type='STEP', is_active=True
-                ).order_by(DIFFICULTY_ORDER, 'order', 'id')
-                for q in qs:
-                    questions_data.append({
-                        'id': q.id, 'type': 'VOCABULARY',
-                        'source_skill_id': child_skill.id,
-                        'source_skill_title': child_skill.title,
-                        'question_text': q.question_text,
-                        'question_image': q.question_image.url if q.question_image else None,
-                        'choice_a': q.choice_a, 'choice_b': q.choice_b,
-                        'choice_c': q.choice_c, 'choice_d': q.choice_d,
-                        'correct_answer': q.correct_answer,
-                        'explanation': q.explanation, 'points': q.points,
-                        'difficulty': q.difficulty,
-                    })
+        # Reading
+        passages = ReadingPassage.objects.filter(
+            step_skill=skill, usage_type='STEP', is_active=True
+        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        for passage in passages:
+            passage_questions = []
+            for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
+                passage_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                })
+            questions_data.append({
+                'id': passage.id, 'type': 'READING',
+                'title': passage.title,
+                'passage_text': passage.passage_text,
+                'passage_image': passage.passage_image.url if passage.passage_image else None,
+                'source': passage.source,
+                'questions': passage_questions,
+                'difficulty': passage.difficulty,
+            })
 
-            elif child_skill.skill_type == 'GRAMMAR':
-                qs = GrammarQuestion.objects.filter(
-                    step_skill=child_skill, usage_type='STEP', is_active=True
-                ).order_by(DIFFICULTY_ORDER, 'order', 'id')
-                for q in qs:
-                    questions_data.append({
-                        'id': q.id, 'type': 'GRAMMAR',
-                        'source_skill_id': child_skill.id,
-                        'source_skill_title': child_skill.title,
-                        'question_text': q.question_text,
-                        'question_image': q.question_image.url if q.question_image else None,
-                        'choice_a': q.choice_a, 'choice_b': q.choice_b,
-                        'choice_c': q.choice_c, 'choice_d': q.choice_d,
-                        'correct_answer': q.correct_answer,
-                        'explanation': q.explanation, 'points': q.points,
-                        'difficulty': q.difficulty,
-                    })
+        # Listening
+        audios = ListeningAudio.objects.filter(
+            step_skill=skill, usage_type='STEP', is_active=True
+        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        for audio in audios:
+            audio_questions = []
+            for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
+                audio_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                })
+            questions_data.append({
+                'id': audio.id, 'type': 'LISTENING',
+                'title': audio.title,
+                'audio_file': str(audio.audio_file) if audio.audio_file else None,
+                'transcript': audio.transcript,
+                'duration': audio.duration,
+                'questions': audio_questions,
+                'difficulty': audio.difficulty,
+            })
 
-            elif child_skill.skill_type == 'READING':
-                passages = ReadingPassage.objects.filter(
-                    step_skill=child_skill, usage_type='STEP', is_active=True
-                ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
-                for passage in passages:
-                    passage_questions = []
-                    for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
-                        passage_questions.append({
-                            'id': q.id, 'question_text': q.question_text,
-                            'choice_a': q.choice_a, 'choice_b': q.choice_b,
-                            'choice_c': q.choice_c, 'choice_d': q.choice_d,
-                            'correct_answer': q.correct_answer,
-                            'explanation': q.explanation, 'points': q.points,
-                        })
-                    questions_data.append({
-                        'id': passage.id, 'type': 'READING',
-                        'source_skill_id': child_skill.id,
-                        'source_skill_title': child_skill.title,
-                        'title': passage.title,
-                        'passage_text': passage.passage_text,
-                        'passage_image': passage.passage_image.url if passage.passage_image else None,
-                        'source': passage.source,
-                        'questions': passage_questions,
-                        'difficulty': passage.difficulty,
-                    })
-
-            elif child_skill.skill_type == 'LISTENING':
-                audios = ListeningAudio.objects.filter(
-                    step_skill=child_skill, usage_type='STEP', is_active=True
-                ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
-                for audio in audios:
-                    audio_questions = []
-                    for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
-                        audio_questions.append({
-                            'id': q.id, 'question_text': q.question_text,
-                            'choice_a': q.choice_a, 'choice_b': q.choice_b,
-                            'choice_c': q.choice_c, 'choice_d': q.choice_d,
-                            'correct_answer': q.correct_answer,
-                            'explanation': q.explanation, 'points': q.points,
-                        })
-                    questions_data.append({
-                        'id': audio.id, 'type': 'LISTENING',
-                        'source_skill_id': child_skill.id,
-                        'source_skill_title': child_skill.title,
-                        'title': audio.title,
-                        'audio_file': str(audio.audio_file) if audio.audio_file else None,
-                        'transcript': audio.transcript,
-                        'duration': audio.duration,
-                        'questions': audio_questions,
-                        'difficulty': audio.difficulty,
-                    })
-
-        # paginate الكل مع بعض
         paginator = Paginator(questions_data, page_size)
         page_obj = paginator.get_page(page)
         questions_data = list(page_obj)

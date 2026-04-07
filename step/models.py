@@ -79,11 +79,6 @@ class STEPSkill(TimeStampedModel, OrderedModel):
             ReadingPassage, WritingQuestion, ListeningAudio,
         )
         skill_type = self.skill_type
-        if skill_type == 'GENERAL_PATH':
-            total = 0
-            for child in self.child_skills.filter(is_active=True):
-                total += child.get_total_questions_count()
-            return total
         if skill_type == 'VOCABULARY':
             return VocabularyQuestion.objects.filter(
                 step_skill=self, usage_type='STEP', is_active=True
@@ -106,6 +101,19 @@ class STEPSkill(TimeStampedModel, OrderedModel):
             return WritingQuestion.objects.filter(
                 step_skill=self, usage_type='STEP', is_active=True
             ).count()
+        elif skill_type == 'GENERAL_PATH':
+            from sabr_questions.models import (
+                VocabularyQuestion, GrammarQuestion,
+                ReadingPassage, ListeningAudio,
+            )
+            total = 0
+            total += VocabularyQuestion.objects.filter(step_skill=self, usage_type='STEP', is_active=True).count()
+            total += GrammarQuestion.objects.filter(step_skill=self, usage_type='STEP', is_active=True).count()
+            passages = ReadingPassage.objects.filter(step_skill=self, usage_type='STEP', is_active=True)
+            total += sum(p.get_questions_count() for p in passages)
+            audios = ListeningAudio.objects.filter(step_skill=self, usage_type='STEP', is_active=True)
+            total += sum(a.questions.filter(is_active=True).count() for a in audios)
+            return total
         return 0
 
 
