@@ -130,7 +130,7 @@ def create_vocabulary_question(request):
 
     try:
         skill = get_object_or_404(STEPSkill, id=data.get('step_skill'))
-        if skill.skill_type != 'VOCABULARY':
+        if skill.skill_type not in ['VOCABULARY', 'GENERAL_PATH']:
             return Response({'error': 'هذه المهارة ليست من نوع Vocabulary'}, status=status.HTTP_400_BAD_REQUEST)
 
         options = data.get('options', [])
@@ -196,7 +196,7 @@ def create_grammar_question(request):
 
     try:
         skill = get_object_or_404(STEPSkill, id=data.get('step_skill'))
-        if skill.skill_type != 'GRAMMAR':
+        if skill.skill_type not in ['GRAMMAR', 'GENERAL_PATH']:
             return Response({'error': 'هذه المهارة ليست من نوع Grammar'}, status=status.HTTP_400_BAD_REQUEST)
 
         options = data.get('options', [])
