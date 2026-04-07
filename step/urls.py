@@ -1,5 +1,7 @@
 from django.urls import path
 from . import views
+from . import ai_views
+
 
 app_name = 'step'
 
@@ -73,4 +75,13 @@ urlpatterns = [
     path('speaking/videos/<int:video_id>/delete/', views.delete_speaking_video, name='delete-speaking-video'),
     path('speaking/questions/<int:question_id>/update/', views.update_speaking_question, name='update-speaking-question'),
     path('speaking/questions/<int:question_id>/delete/', views.delete_speaking_question, name='delete-speaking-question'),
+    # AI Generation
+    path('ai/extract-book/', ai_views.list_extracted_books, name='list-extracted-books'),
+    path('ai/extract-book/upload/', ai_views.extract_book, name='extract-book'),
+    path('ai/extract-book/<int:book_id>/status/', ai_views.extract_book_status, name='extract-book-status'),
+    path('ai/extract-media/', ai_views.list_extracted_media, name='list-extracted-media'),
+    path('ai/extract-media/upload/', ai_views.extract_media, name='extract-media'),
+    path('ai/extract-media/<int:media_id>/status/', ai_views.extract_media_status, name='extract-media-status'),
+    path('ai/generate-skill/', ai_views.generate_skill, name='generate-skill'),
+    path('ai/jobs/<int:job_id>/status/', ai_views.generation_job_status, name='generation-job-status'),
 ]

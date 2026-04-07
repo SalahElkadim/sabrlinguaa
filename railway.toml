@@ -8,3 +8,6 @@ restartPolicyMaxRetries = 10
 
 [env]
 PYTHONUNBUFFERED = "1"
+
+[phases.setup]
+nixPkgs = ["ffmpeg"]

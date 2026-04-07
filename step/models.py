@@ -273,3 +273,6 @@ class StudentSTEPQuestionView(TimeStampedModel):
     
     def __str__(self):
         return f"{self.student.email} - {self.question_type} #{self.question_id}"
+    
+# Import AI models عشان يتعمل migrate معاهم
+from .ai_models import ExtractedBook, ExtractedMedia, AIGenerationJob
