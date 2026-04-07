@@ -559,7 +559,6 @@ DIFFICULTY_ORDER = Case(
     output_field=IntegerField()
 )
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_skill_questions(request, skill_id):
@@ -577,12 +576,52 @@ def get_skill_questions(request, skill_id):
     skill = get_object_or_404(STEPSkill, id=skill_id)
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 20))
+    student = request.user
     questions_data = []
+
+    # ============================================================
+    # ✅ جيب كل محاولات الطالب في المهارة دي دفعة واحدة
+    # بنعمل dict بالشكل ده: {('VOCABULARY', 95): attempt_obj, ...}
+    # عشان نعمل lookup سريع لكل سؤال من غير ما نضرب DB لكل سؤال
+    # ============================================================
+    attempts_qs = StudentSTEPQuestionAttempt.objects.filter(
+        student=student,
+        skill=skill,
+    )
+    attempts_map = {
+        (a.question_type, a.question_id): a
+        for a in attempts_qs
+    }
+
+    # ============================================================
+    # جيب التوتال سكور للطالب في المهارة دي
+    # ============================================================
+    try:
+        progress = StudentSTEPProgress.objects.get(student=student, skill=skill)
+        skill_total_score = progress.total_score
+    except StudentSTEPProgress.DoesNotExist:
+        skill_total_score = 0
+
+    # Helper: يجيب بيانات المحاولة لسؤال معين
+    def get_attempt_data(q_type, q_id):
+        attempt = attempts_map.get((q_type, q_id))
+        if attempt:
+            return {
+                'is_solved': attempt.is_solved,
+                'points_earned': attempt.points_earned,
+                'attempts_count': attempt.attempts_count,
+                'used_show_answer': attempt.used_show_answer,
+            }
+        return {
+            'is_solved': False,
+            'points_earned': 0,
+            'attempts_count': 0,
+            'used_show_answer': False,
+        }
 
     if skill.skill_type == 'VOCABULARY':
         questions = VocabularyQuestion.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
         ).order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
@@ -596,12 +635,12 @@ def get_skill_questions(request, skill_id):
                 'correct_answer': q.correct_answer,
                 'explanation': q.explanation, 'points': q.points,
                 'difficulty': q.difficulty,
+                **get_attempt_data('VOCABULARY', q.id),  # ✅
             })
 
     elif skill.skill_type == 'GRAMMAR':
         questions = GrammarQuestion.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
         ).order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
@@ -615,19 +654,17 @@ def get_skill_questions(request, skill_id):
                 'correct_answer': q.correct_answer,
                 'explanation': q.explanation, 'points': q.points,
                 'difficulty': q.difficulty,
+                **get_attempt_data('GRAMMAR', q.id),  # ✅
             })
 
     elif skill.skill_type == 'READING':
         passages = ReadingPassage.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
         ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(passages, page_size)
         page_obj = paginator.get_page(page)
         for passage in page_obj:
             passage_questions = []
-            # ملاحظة: أسئلة الـ passage محتفظة بترتيبها الطبيعي (order, id)
-            # لأنها مرتبطة بتسلسل النص ومش منطقي نكسر ترتيبها
             for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
                 passage_questions.append({
                     'id': q.id, 'question_text': q.question_text,
@@ -635,6 +672,7 @@ def get_skill_questions(request, skill_id):
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
                     'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('READING', q.id),  # ✅
                 })
             questions_data.append({
                 'id': passage.id, 'type': 'READING',
@@ -649,14 +687,11 @@ def get_skill_questions(request, skill_id):
     elif skill.skill_type == 'LISTENING':
         audios = ListeningAudio.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
         ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(audios, page_size)
         page_obj = paginator.get_page(page)
         for audio in page_obj:
             audio_questions = []
-            # ملاحظة: أسئلة الـ audio محتفظة بترتيبها الطبيعي (order, id)
-            # لأنها مرتبطة بتسلسل التسجيل الصوتي ومش منطقي نكسر ترتيبها
             for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
                 audio_questions.append({
                     'id': q.id, 'question_text': q.question_text,
@@ -664,6 +699,7 @@ def get_skill_questions(request, skill_id):
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
                     'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('LISTENING', q.id),  # ✅
                 })
             questions_data.append({
                 'id': audio.id, 'type': 'LISTENING',
@@ -678,7 +714,6 @@ def get_skill_questions(request, skill_id):
     elif skill.skill_type == 'WRITING':
         questions = WritingQuestion.objects.filter(
             step_skill=skill, usage_type='STEP', is_active=True
-        # ✅ تعديل: الترتيب حسب الصعوبة أولاً (EASY ثم MEDIUM ثم HARD)، ثم order، ثم id
         ).order_by(DIFFICULTY_ORDER, 'order', 'id')
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
@@ -691,6 +726,7 @@ def get_skill_questions(request, skill_id):
                 'sample_answer': q.sample_answer, 'rubric': q.rubric,
                 'points': q.points,
                 'difficulty': q.difficulty,
+                **get_attempt_data('WRITING', q.id),  # ✅
             })
 
     elif skill.skill_type == 'GENERAL_PATH':
@@ -698,6 +734,17 @@ def get_skill_questions(request, skill_id):
             VocabularyQuestion, GrammarQuestion,
             ReadingPassage, ListeningAudio,
         )
+
+        # ✅ للـ GENERAL_PATH، الـ attempts_map ممكن يحتاج يجيب من child skills كمان
+        # بنوسع الـ attempts_map عشان يشمل كل الـ child skills
+        child_skills = skill.child_skills.filter(is_active=True)
+        if child_skills.exists():
+            extra_attempts = StudentSTEPQuestionAttempt.objects.filter(
+                student=student,
+                skill__in=child_skills,
+            )
+            for a in extra_attempts:
+                attempts_map.setdefault((a.question_type, a.question_id), a)
 
         # Vocabulary
         vocab_qs = VocabularyQuestion.objects.filter(
@@ -713,6 +760,7 @@ def get_skill_questions(request, skill_id):
                 'correct_answer': q.correct_answer,
                 'explanation': q.explanation, 'points': q.points,
                 'difficulty': q.difficulty,
+                **get_attempt_data('VOCABULARY', q.id),  # ✅
             })
 
         # Grammar
@@ -729,6 +777,7 @@ def get_skill_questions(request, skill_id):
                 'correct_answer': q.correct_answer,
                 'explanation': q.explanation, 'points': q.points,
                 'difficulty': q.difficulty,
+                **get_attempt_data('GRAMMAR', q.id),  # ✅
             })
 
         # Reading
@@ -744,6 +793,7 @@ def get_skill_questions(request, skill_id):
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
                     'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('READING', q.id),  # ✅
                 })
             questions_data.append({
                 'id': passage.id, 'type': 'READING',
@@ -768,6 +818,7 @@ def get_skill_questions(request, skill_id):
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
                     'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('LISTENING', q.id),  # ✅
                 })
             questions_data.append({
                 'id': audio.id, 'type': 'LISTENING',
@@ -789,14 +840,36 @@ def get_skill_questions(request, skill_id):
                 'title': skill.title,
                 'skill_type': skill.skill_type,
             },
+            'skill_total_score': skill_total_score,  # ✅
             'pagination': {
                 'page': page,
                 'page_size': page_size,
-                'total_pages': paginator.num_pages if 'paginator' in locals() else 1,
-                'total_items': paginator.count if 'paginator' in locals() else len(questions_data),
+                'total_pages': paginator.num_pages,
+                'total_items': paginator.count,
             },
             'questions': questions_data
         }, status=status.HTTP_200_OK)
+
+    # ============================================================
+    # Response للـ skill types العادية (غير GENERAL_PATH)
+    # ============================================================
+    paginator = Paginator(questions_data, page_size)
+
+    return Response({
+        'skill': {
+            'id': skill.id,
+            'title': skill.title,
+            'skill_type': skill.skill_type,
+        },
+        'skill_total_score': skill_total_score,  # ✅
+        'pagination': {
+            'page': page,
+            'page_size': page_size,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+        },
+        'questions': questions_data
+    }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
