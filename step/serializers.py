@@ -12,10 +12,10 @@ User = get_user_model()
 # ============================================
 # STEP Skill Serializers
 # ============================================
-
 class STEPSkillListSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
-    
+    child_skills = serializers.SerializerMethodField()  # ← جديد
+
     class Meta:
         model = STEPSkill
         fields = [
@@ -26,33 +26,42 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
             'icon',
             'order',
             'total_questions',
+            'child_skills',  # ← جديد
         ]
-    
+
     def get_total_questions(self, obj):
         return obj.get_total_questions_count()
 
+    # ← جديد
+    def get_child_skills(self, obj):
+        if obj.skill_type == 'GENERAL_PATH':
+            children = obj.child_skills.filter(is_active=True).order_by('order')
+            return STEPSkillListSerializer(children, many=True).data
+        return None
 
 class STEPSkillDetailSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
-    
+    child_skills = serializers.SerializerMethodField()  # ← جديد
+
     class Meta:
         model = STEPSkill
         fields = [
-            'id',
-            'skill_type',
-            'title',
-            'description',
-            'icon',
-            'order',
-            'is_active',
-            'total_questions',
-            'created_at',
-            'updated_at',
+            'id', 'skill_type', 'title', 'description',
+            'icon', 'order', 'is_active', 'total_questions',
+            'child_skills',  # ← جديد
+            'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
-    
+
     def get_total_questions(self, obj):
         return obj.get_total_questions_count()
+
+    # ← جديد
+    def get_child_skills(self, obj):
+        if obj.skill_type == 'GENERAL_PATH':
+            children = obj.child_skills.filter(is_active=True).order_by('order')
+            return STEPSkillListSerializer(children, many=True).data
+        return None
 
 
 # ============================================

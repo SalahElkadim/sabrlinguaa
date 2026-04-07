@@ -41,6 +41,8 @@ class STEPSkill(TimeStampedModel, OrderedModel):
         ('READING', 'Reading'),
         ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
+        ('GENERAL_PATH', 'المسار العام'),  # ← جديد
+
     ]
     
     skill_type = models.CharField(
@@ -56,7 +58,13 @@ class STEPSkill(TimeStampedModel, OrderedModel):
         null=True,
         folder='step/skill_icons',
     )
-    
+    child_skills = models.ManyToManyField(
+        'self',
+        symmetrical=False,
+        blank=True,
+        related_name='parent_paths',
+        verbose_name="المهارات الفرعية"
+    )
     class Meta:
         verbose_name = "STEP Skill"
         verbose_name_plural = "STEP Skills"
@@ -71,6 +79,11 @@ class STEPSkill(TimeStampedModel, OrderedModel):
             ReadingPassage, WritingQuestion, ListeningAudio,
         )
         skill_type = self.skill_type
+        if skill_type == 'GENERAL_PATH':
+            total = 0
+            for child in self.child_skills.filter(is_active=True):
+                total += child.get_total_questions_count()
+            return total
         if skill_type == 'VOCABULARY':
             return VocabularyQuestion.objects.filter(
                 step_skill=self, usage_type='STEP', is_active=True

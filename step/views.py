@@ -693,20 +693,123 @@ def get_skill_questions(request, skill_id):
                 'difficulty': q.difficulty,
             })
 
-    return Response({
-        'skill': {
-            'id': skill.id,
-            'title': skill.title,
-            'skill_type': skill.skill_type,
-        },
-        'pagination': {
-            'page': page,
-            'page_size': page_size,
-            'total_pages': paginator.num_pages if 'paginator' in locals() else 1,
-            'total_items': paginator.count if 'paginator' in locals() else len(questions_data),
-        },
-        'questions': questions_data
-    }, status=status.HTTP_200_OK)
+    elif skill.skill_type == 'GENERAL_PATH':
+        from sabr_questions.models import (
+            VocabularyQuestion, GrammarQuestion,
+            ReadingPassage, ListeningAudio,
+        )
+
+        child_skills = skill.child_skills.filter(is_active=True).order_by('order')
+
+        for child_skill in child_skills:
+
+            if child_skill.skill_type == 'VOCABULARY':
+                qs = VocabularyQuestion.objects.filter(
+                    step_skill=child_skill, usage_type='STEP', is_active=True
+                ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+                for q in qs:
+                    questions_data.append({
+                        'id': q.id, 'type': 'VOCABULARY',
+                        'source_skill_id': child_skill.id,
+                        'source_skill_title': child_skill.title,
+                        'question_text': q.question_text,
+                        'question_image': q.question_image.url if q.question_image else None,
+                        'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                        'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                        'correct_answer': q.correct_answer,
+                        'explanation': q.explanation, 'points': q.points,
+                        'difficulty': q.difficulty,
+                    })
+
+            elif child_skill.skill_type == 'GRAMMAR':
+                qs = GrammarQuestion.objects.filter(
+                    step_skill=child_skill, usage_type='STEP', is_active=True
+                ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+                for q in qs:
+                    questions_data.append({
+                        'id': q.id, 'type': 'GRAMMAR',
+                        'source_skill_id': child_skill.id,
+                        'source_skill_title': child_skill.title,
+                        'question_text': q.question_text,
+                        'question_image': q.question_image.url if q.question_image else None,
+                        'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                        'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                        'correct_answer': q.correct_answer,
+                        'explanation': q.explanation, 'points': q.points,
+                        'difficulty': q.difficulty,
+                    })
+
+            elif child_skill.skill_type == 'READING':
+                passages = ReadingPassage.objects.filter(
+                    step_skill=child_skill, usage_type='STEP', is_active=True
+                ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+                for passage in passages:
+                    passage_questions = []
+                    for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
+                        passage_questions.append({
+                            'id': q.id, 'question_text': q.question_text,
+                            'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                            'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                            'correct_answer': q.correct_answer,
+                            'explanation': q.explanation, 'points': q.points,
+                        })
+                    questions_data.append({
+                        'id': passage.id, 'type': 'READING',
+                        'source_skill_id': child_skill.id,
+                        'source_skill_title': child_skill.title,
+                        'title': passage.title,
+                        'passage_text': passage.passage_text,
+                        'passage_image': passage.passage_image.url if passage.passage_image else None,
+                        'source': passage.source,
+                        'questions': passage_questions,
+                        'difficulty': passage.difficulty,
+                    })
+
+            elif child_skill.skill_type == 'LISTENING':
+                audios = ListeningAudio.objects.filter(
+                    step_skill=child_skill, usage_type='STEP', is_active=True
+                ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+                for audio in audios:
+                    audio_questions = []
+                    for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
+                        audio_questions.append({
+                            'id': q.id, 'question_text': q.question_text,
+                            'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                            'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                            'correct_answer': q.correct_answer,
+                            'explanation': q.explanation, 'points': q.points,
+                        })
+                    questions_data.append({
+                        'id': audio.id, 'type': 'LISTENING',
+                        'source_skill_id': child_skill.id,
+                        'source_skill_title': child_skill.title,
+                        'title': audio.title,
+                        'audio_file': str(audio.audio_file) if audio.audio_file else None,
+                        'transcript': audio.transcript,
+                        'duration': audio.duration,
+                        'questions': audio_questions,
+                        'difficulty': audio.difficulty,
+                    })
+
+        # paginate الكل مع بعض
+        paginator = Paginator(questions_data, page_size)
+        page_obj = paginator.get_page(page)
+        questions_data = list(page_obj)
+
+        return Response({
+            'skill': {
+                'id': skill.id,
+                'title': skill.title,
+                'skill_type': skill.skill_type,
+            },
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total_pages': paginator.num_pages if 'paginator' in locals() else 1,
+                'total_items': paginator.count if 'paginator' in locals() else len(questions_data),
+            },
+            'questions': questions_data
+        }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -779,8 +882,9 @@ def my_progress(request):
     total_score = sum(p.total_score for p in progress_records)
     total_viewed = sum(p.viewed_questions_count for p in progress_records)
 
-    all_skills = STEPSkill.objects.filter(is_active=True)
+    all_skills = STEPSkill.objects.filter(is_active=True).exclude(skill_type='GENERAL_PATH')
     total_available = sum(skill.get_total_questions_count() for skill in all_skills)
+
 
     overall_percentage = 0
     if total_available > 0:
@@ -805,7 +909,32 @@ def skill_progress(request, skill_id):
     """
     skill = get_object_or_404(STEPSkill, id=skill_id)
     student = request.user
+    if skill.skill_type == 'GENERAL_PATH':
+        child_skills = skill.child_skills.filter(is_active=True)
+        total_viewed = 0
+        total_score = 0
+        total_questions = 0
 
+        for child in child_skills:
+            total_questions += child.get_total_questions_count()
+            try:
+                progress = StudentSTEPProgress.objects.get(student=student, skill=child)
+                total_viewed += progress.viewed_questions_count
+                total_score += progress.total_score
+            except StudentSTEPProgress.DoesNotExist:
+                pass
+
+        overall_percentage = 0
+        if total_questions > 0:
+            overall_percentage = round((total_viewed / total_questions) * 100, 2)
+
+        return Response({
+            'skill': {'id': skill.id, 'title': skill.title, 'skill_type': skill.skill_type},
+            'viewed_questions_count': total_viewed,
+            'total_questions': total_questions,
+            'progress_percentage': overall_percentage,
+            'total_score': total_score,
+        }, status=status.HTTP_200_OK)
     try:
         progress = StudentSTEPProgress.objects.get(student=student, skill=skill)
         serializer = StudentSTEPProgressSerializer(progress)
@@ -1645,3 +1774,38 @@ def get_question_attempt_status(request, skill_id, question_type, question_id):
             'remaining_attempts': 4,
             'next_attempt_points': 20,  # أول محاولة = 20 نقطة
         }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def set_child_skills(request, skill_id):
+    """
+    POST /api/step/skills/{skill_id}/set-children/
+    Body: { "child_skill_ids": [1, 2, 3, 4] }
+    """
+    skill = get_object_or_404(STEPSkill, id=skill_id)
+    
+    if skill.skill_type != 'GENERAL_PATH':
+        return Response(
+            {'error': 'هذه المهارة ليست مساراً عاماً'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    child_ids = request.data.get('child_skill_ids', [])
+    
+    # تتأكد إن مفيش GENERAL_PATH يكون child لـ GENERAL_PATH تاني
+    invalid = STEPSkill.objects.filter(
+        id__in=child_ids, skill_type='GENERAL_PATH'
+    )
+    if invalid.exists():
+        return Response(
+            {'error': 'لا يمكن إضافة مسار عام كمهارة فرعية'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    children = STEPSkill.objects.filter(id__in=child_ids)
+    skill.child_skills.set(children)
+    
+    return Response({
+        'message': 'تم تحديث المهارات الفرعية بنجاح',
+        'child_skills': [{'id': c.id, 'title': c.title, 'skill_type': c.skill_type} for c in children]
+    }, status=status.HTTP_200_OK)
