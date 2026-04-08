@@ -200,6 +200,7 @@ def list_extracted_media(request):
                 'media_type': m.media_type,
                 'duration_seconds': m.duration_seconds,
                 'created_at': m.created_at,
+                'status': m.status,
             }
             for m in media_qs
         ]
