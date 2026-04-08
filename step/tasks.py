@@ -31,12 +31,13 @@ def extract_book_task(self, book_id: int):
         import urllib.request
         import cloudinary.utils
 
-        pdf_url, _ = cloudinary.utils.cloudinary_url(
-        str(book.pdf_file),
-        resource_type='raw',
-        sign_url=True,  # ← بيعمل signed URL
-        api_secret=settings.CLOUDINARY_API_SECRET,
-    )
+        import urllib.request
+
+        pdf_url = book.pdf_file.url
+        response = urllib.request.urlopen(pdf_url)
+        pdf_bytes = response.read()
+
+    # هنا كمل استخراج النص من pdf_bytes
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
             urllib.request.urlretrieve(pdf_url, tmp.name)
             tmp_path = tmp.name
