@@ -36,6 +36,7 @@ def extract_book(request):
             pdf_file,
             resource_type='raw',
             folder='step/ai/books',
+            access_mode='public',
         )
         book = ExtractedBook.objects.create(
             name=name,

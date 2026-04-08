@@ -32,7 +32,7 @@ def extract_book_task(self, book_id: int):
         import cloudinary.utils
 
         pdf_url = cloudinary.utils.cloudinary_url(
-            str(book.pdf_file), 
+            str(book.pdf_file),
             resource_type='raw'
         )[0]
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
