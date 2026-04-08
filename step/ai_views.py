@@ -94,6 +94,7 @@ def list_extracted_books(request):
                 'name': b.name,
                 'page_count': b.page_count,
                 'created_at': b.created_at,
+                'status': b.status,
             }
             for b in books
         ]
