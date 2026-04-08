@@ -18,7 +18,7 @@ def extract_book(request):
     Body (multipart): { name, pdf_file }
     """
     from .ai_models import ExtractedBook
-    from .ai_tasks import extract_book_task
+    from .tasks import extract_book_task
 
     name = request.data.get('name', '').strip()
     pdf_file = request.FILES.get('pdf_file')
@@ -107,7 +107,7 @@ def extract_media(request):
     Body (multipart): { name, media_file }
     """
     from .ai_models import ExtractedMedia
-    from .ai_tasks import extract_media_task
+    from .tasks import extract_media_task
 
     name = request.data.get('name', '').strip()
     media_file = request.FILES.get('media_file')
@@ -223,7 +223,7 @@ def generate_skill(request):
     }
     """
     from .ai_models import AIGenerationJob, ExtractedBook, ExtractedMedia
-    from .ai_tasks import generate_skill_task
+    from .tasks import generate_skill_task
 
     data = request.data
 
