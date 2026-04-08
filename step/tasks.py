@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 import logging
-
+from django.conf import settings
 from celery import shared_task
 from django.db import transaction
 
@@ -31,10 +31,12 @@ def extract_book_task(self, book_id: int):
         import urllib.request
         import cloudinary.utils
 
-        pdf_url = cloudinary.utils.cloudinary_url(
-            str(book.pdf_file),
-            resource_type='raw'
-        )[0]
+        pdf_url, _ = cloudinary.utils.cloudinary_url(
+        str(book.pdf_file),
+        resource_type='raw',
+        sign_url=True,  # ← بيعمل signed URL
+        api_secret=settings.CLOUDINARY_API_SECRET,
+    )
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
             urllib.request.urlretrieve(pdf_url, tmp.name)
             tmp_path = tmp.name
