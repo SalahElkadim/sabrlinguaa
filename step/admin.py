@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import STEPSkill, StudentSTEPProgress, StudentSTEPQuestionView
-
+from .ai_models import ExtractedBook,ExtractedMedia,AIGenerationJob
 
 # ============================================
 # STEP Skill Admin
@@ -220,3 +220,7 @@ class StudentSTEPQuestionViewAdmin(admin.ModelAdmin):
             color, label
         )
     question_type_badge.short_description = 'نوع السؤال'
+
+admin.site.register(ExtractedBook)
+admin.site.register(ExtractedMedia)
+admin.site.register(AIGenerationJob)

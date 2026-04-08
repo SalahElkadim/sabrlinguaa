@@ -244,7 +244,7 @@ def _generate_questions_for_skill(skill, skill_type, content, no_easy, no_medium
     )
 
 
-    raw_text = response.content[0].text.strip()
+    raw_text = response.choices[0].message.content.strip()
 
     # نظف الـ JSON لو فيه backticks
     if raw_text.startswith("```"):
