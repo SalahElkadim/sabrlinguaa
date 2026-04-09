@@ -119,7 +119,7 @@ def extract_media_task(self, media_id: int):
             audio_path = tmp_audio_path
 
         # Whisper transcription
-        whisper_model = whisper.load_model("base")
+        whisper_model = whisper.load_model("tiny")
         result = whisper_model.transcribe(audio_path)
         transcript = result.get("text", "").strip()
         duration = int(result.get("duration", 0))
