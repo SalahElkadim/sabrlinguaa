@@ -133,14 +133,6 @@ class UsageTypeMixin(models.Model):
     # ============================================
     # Foreign Keys للاختبارات المختلفة
     # ============================================
-    ielts_lesson = models.ForeignKey(
-        'ielts.IELTSLesson',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='%(class)s_questions',
-        verbose_name="IELTS Lesson",
-    )
     # Existing FK (موجود بالفعل)
     placement_test = models.ForeignKey(
         'placement_test.PlacementTest',
@@ -182,15 +174,6 @@ class UsageTypeMixin(models.Model):
     )
     
     # 🆕 NEW: Foreign Key للـ IELTS System
-    ielts_lesson_pack = models.ForeignKey(
-        'ielts.LessonPack',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='%(class)s_questions',
-        verbose_name="IELTS Lesson Pack",
-        help_text="لأسئلة امتحان IELTS (usage_type=IELTS)"
-    )
     step_skill = models.ForeignKey(
         'step.STEPSkill',
         on_delete=models.SET_NULL,
@@ -199,6 +182,15 @@ class UsageTypeMixin(models.Model):
         related_name='%(class)s_questions',
         verbose_name="STEP Skill",
         help_text="لأسئلة STEP (usage_type=STEP)"
+    )
+    ielts_skill = models.ForeignKey(
+        'ielts.IELTSSkill',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='%(class)s_questions',
+        verbose_name="IELTS Skill",
+        help_text="لأسئلة IELTS (usage_type=IELTS)"
     )
     
     class Meta:

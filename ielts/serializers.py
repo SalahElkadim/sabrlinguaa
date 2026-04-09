@@ -2,513 +2,238 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import (
     IELTSSkill,
-    LessonPack,
-    IELTSLesson,
-    ReadingLessonContent,
-    WritingLessonContent,
-    SpeakingLessonContent,
-    ListeningLessonContent,
-    IELTSPracticeExam,
-    SpeakingRecordingTask,
-    StudentSpeakingRecording,
-    StudentLessonPackProgress,
-    StudentLessonProgress,
-    StudentPracticeExamAttempt,
+    StudentIELTSProgress,
+    StudentIELTSQuestionView,
 )
 
 User = get_user_model()
 
 
 # ============================================
-# Basic Serializers
+# IELTS Skill Serializers
 # ============================================
-
-class IELTSSkillSerializer(serializers.ModelSerializer):
-    lesson_packs_count = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = IELTSSkill
-        fields = [
-            'id', 'skill_type', 'title', 'description', 'icon',
-            'order', 'is_active', 'lesson_packs_count', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_lesson_packs_count(self, obj):
-        return obj.get_lesson_packs_count()
-
-
 class IELTSSkillListSerializer(serializers.ModelSerializer):
-    lesson_packs_count = serializers.SerializerMethodField()
-    
+    total_questions = serializers.SerializerMethodField()
+    child_skills = serializers.SerializerMethodField()  # ← جديد
+
     class Meta:
         model = IELTSSkill
-        fields = ['id', 'skill_type', 'title', 'icon', 'order', 'lesson_packs_count']
-    
-    def get_lesson_packs_count(self, obj):
-        return obj.get_lesson_packs_count()
-
-
-# ============================================
-# Lesson Content Serializers
-# ============================================
-
-class ReadingLessonContentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ReadingLessonContent
         fields = [
-            'id', 'lesson', 'reading_text', 'explanation',
-            'vocabulary_words', 'examples', 'video_url', 'resources',
+            'id',
+            'skill_type',
+            'title',
+            'description',
+            'icon',
+            'order',
+            'total_questions',
+            'child_skills',  # ← جديد
+        ]
+
+    def get_total_questions(self, obj):
+        return obj.get_total_questions_count()
+
+    # ← جديد
+    def get_child_skills(self, obj):
+        if obj.skill_type == 'GENERAL_PATH':
+            children = obj.child_skills.filter(is_active=True).order_by('order')
+            return IELTSSkillListSerializer(children, many=True).data
+        return None
+
+class IELTSSkillDetailSerializer(serializers.ModelSerializer):
+    total_questions = serializers.SerializerMethodField()
+    child_skills = serializers.SerializerMethodField()  # ← جديد
+
+    class Meta:
+        model = IELTSSkill
+        fields = [
+            'id', 'skill_type', 'title', 'description',
+            'icon', 'order', 'is_active', 'total_questions',
+            'child_skills',  # ← جديد
             'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def get_total_questions(self, obj):
+        return obj.get_total_questions_count()
 
-class WritingLessonContentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = WritingLessonContent
-        fields = [
-            'id', 'lesson', 'sample_texts', 'writing_instructions',
-            'tips', 'examples', 'video_url', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-
-
-class SpeakingLessonContentSerializer(serializers.ModelSerializer):
-    video_file = serializers.SerializerMethodField()
-
-    def get_video_file(self, obj):
-        if not obj.video_file:
-            return None
-        url = str(obj.video_file)
-        if 'upload/http' in url:
-            return url.split('upload/')[-1]
-        return url
-
-    class Meta:
-        model = SpeakingLessonContent
-        fields = [
-            'id', 'lesson', 'video_file', 'dialogue_texts',
-            'useful_phrases', 'audio_examples', 'pronunciation_tips',
-            'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-
-
-class ListeningLessonContentSerializer(serializers.ModelSerializer):
-    audio_file = serializers.SerializerMethodField()
-
-    def get_audio_file(self, obj):
-        if not obj.audio_file:
-            return None
-        url = str(obj.audio_file)
-        if 'upload/http' in url:
-            return url.split('upload/')[-1]
-        return url
-
-    class Meta:
-        model = ListeningLessonContent
-        fields = [
-            'id', 'lesson', 'audio_file', 'transcript',
-            'vocabulary_explanation', 'listening_exercises', 'tips',
-            'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-
-
-# ============================================
-# Lesson Serializers
-# ============================================
-
-class IELTSLessonListSerializer(serializers.ModelSerializer):
-    skill_type = serializers.CharField(source='lesson_pack.skill.skill_type', read_only=True)
-    
-    class Meta:
-        model = IELTSLesson
-        fields = ['id', 'lesson_pack', 'skill_type', 'title', 'description', 'order', 'is_active']
-
-
-class IELTSLessonDetailSerializer(serializers.ModelSerializer):
-    skill_type = serializers.CharField(source='lesson_pack.skill.skill_type', read_only=True)
-    content = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = IELTSLesson
-        fields = [
-            'id', 'lesson_pack', 'skill_type', 'title', 'description',
-            'order', 'is_active', 'content', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_content(self, obj):
-        skill_type = obj.lesson_pack.skill.skill_type
-        
-        if skill_type == 'READING':
-            content = ReadingLessonContent.objects.filter(lesson=obj).first()
-            return ReadingLessonContentSerializer(content).data if content else None
-        
-        elif skill_type == 'WRITING':
-            content = WritingLessonContent.objects.filter(lesson=obj).first()
-            return WritingLessonContentSerializer(content).data if content else None
-        
-        elif skill_type == 'SPEAKING':
-            content = SpeakingLessonContent.objects.filter(lesson=obj).first()
-            return SpeakingLessonContentSerializer(content).data if content else None
-        
-        elif skill_type == 'LISTENING':
-            content = ListeningLessonContent.objects.filter(lesson=obj).first()
-            return ListeningLessonContentSerializer(content).data if content else None
-        
+    # ← جديد
+    def get_child_skills(self, obj):
+        if obj.skill_type == 'GENERAL_PATH':
+            children = obj.child_skills.filter(is_active=True).order_by('order')
+            return IELTSSkillListSerializer(children, many=True).data
         return None
 
 
 # ============================================
-# Lesson Pack Serializers
+# Student Progress Serializers
 # ============================================
 
-class LessonPackListSerializer(serializers.ModelSerializer):
-    skill_type = serializers.CharField(source='skill.skill_type', read_only=True)
+class StudentIELTSProgressSerializer(serializers.ModelSerializer):
     skill_title = serializers.CharField(source='skill.title', read_only=True)
-    lessons_count = serializers.SerializerMethodField()
-    has_practice_exam = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = LessonPack
-        fields = [
-            'id', 'skill', 'skill_type', 'skill_title', 'title', 'description',
-            'order', 'is_active', 'exam_time_limit', 'exam_passing_score',
-            'lessons_count', 'has_practice_exam',
-        ]
-    
-    def get_lessons_count(self, obj):
-        return obj.get_lessons_count()
-    
-    def get_has_practice_exam(self, obj):
-        return obj.get_practice_exam() is not None
-
-
-class LessonPackDetailSerializer(serializers.ModelSerializer):
     skill_type = serializers.CharField(source='skill.skill_type', read_only=True)
+    progress_percentage = serializers.SerializerMethodField()
+    total_questions = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = StudentIELTSProgress
+        fields = [
+            'id',
+            'student',
+            'skill',
+            'skill_title',
+            'skill_type',
+            'viewed_questions_count',
+            'total_questions',
+            'progress_percentage',
+            'total_score',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'viewed_questions_count', 'total_score']
+    
+    def get_progress_percentage(self, obj):
+        return obj.calculate_progress_percentage()
+    
+    def get_total_questions(self, obj):
+        return obj.skill.get_total_questions_count()
+
+
+class StudentIELTSQuestionViewSerializer(serializers.ModelSerializer):
     skill_title = serializers.CharField(source='skill.title', read_only=True)
-    lessons = IELTSLessonListSerializer(many=True, read_only=True)
-    practice_exam = serializers.SerializerMethodField()
-    lessons_count = serializers.SerializerMethodField()
     
     class Meta:
-        model = LessonPack
+        model = StudentIELTSQuestionView
         fields = [
-            'id', 'skill', 'skill_type', 'skill_title', 'title', 'description',
-            'order', 'is_active', 'exam_time_limit', 'exam_passing_score',
-            'lessons', 'lessons_count', 'practice_exam', 'created_at', 'updated_at',
+            'id',
+            'student',
+            'skill',
+            'skill_title',
+            'question_type',
+            'question_id',
+            'viewed_at',
         ]
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_lessons_count(self, obj):
-        return obj.get_lessons_count()
-    
-    def get_practice_exam(self, obj):
-        exam = obj.get_practice_exam()
-        if exam:
-            return {'id': exam.id, 'title': exam.title, 'questions_count': exam.get_questions_count()}
-        return None
+        read_only_fields = ['viewed_at']
 
 
 # ============================================
-# Practice Exam Serializers
+# Question Serializers
 # ============================================
 
-class IELTSPracticeExamSerializer(serializers.ModelSerializer):
-    lesson_pack_title = serializers.CharField(source='lesson_pack.title', read_only=True)
-    time_limit = serializers.IntegerField(source='lesson_pack.exam_time_limit', read_only=True)
-    passing_score = serializers.IntegerField(source='lesson_pack.exam_passing_score', read_only=True)
-    questions_count = serializers.SerializerMethodField()
-    vocabulary_count = serializers.SerializerMethodField()
-    grammar_count = serializers.SerializerMethodField()
-    reading_count = serializers.SerializerMethodField()
-    listening_count = serializers.SerializerMethodField()
-    speaking_count = serializers.SerializerMethodField()
-    writing_count = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = IELTSPracticeExam
-        fields = [
-            'id', 'lesson_pack', 'lesson_pack_title', 'title', 'instructions',
-            'time_limit', 'passing_score', 'questions_count',
-            'vocabulary_count', 'grammar_count', 'reading_count',
-            'listening_count', 'speaking_count', 'writing_count',
-            'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_questions_count(self, obj):
-        return obj.get_questions_count()
-    
-    def get_vocabulary_count(self, obj):
-        from sabr_questions.models import VocabularyQuestion
-        return VocabularyQuestion.objects.filter(ielts_lesson_pack=obj.lesson_pack, usage_type='IELTS', is_active=True).count()
-    
-    def get_grammar_count(self, obj):
-        from sabr_questions.models import GrammarQuestion
-        return GrammarQuestion.objects.filter(ielts_lesson_pack=obj.lesson_pack, usage_type='IELTS', is_active=True).count()
-    
-    def get_reading_count(self, obj):
-        from sabr_questions.models import ReadingPassage
-        return ReadingPassage.objects.filter(ielts_lesson_pack=obj.lesson_pack, usage_type='IELTS', is_active=True).count()
-    
-    def get_listening_count(self, obj):
-        from sabr_questions.models import ListeningAudio
-        return ListeningAudio.objects.filter(ielts_lesson_pack=obj.lesson_pack, usage_type='IELTS', is_active=True).count()
-    
-    def get_speaking_count(self, obj):
-        from sabr_questions.models import SpeakingVideo
-        videos = SpeakingVideo.objects.filter(ielts_lesson_pack=obj.lesson_pack, usage_type='IELTS', is_active=True).count()
-        recordings = obj.lesson_pack.speaking_recording_tasks.filter(is_active=True).count()
-        return videos + recordings
-    
-    def get_writing_count(self, obj):
-        from sabr_questions.models import WritingQuestion
-        return WritingQuestion.objects.filter(ielts_lesson_pack=obj.lesson_pack, usage_type='IELTS', is_active=True).count()
-
-
-# ============================================
-# Speaking Recording Serializers
-# ============================================
-
-class SpeakingRecordingTaskSerializer(serializers.ModelSerializer):
-    max_total_score = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = SpeakingRecordingTask
-        fields = [
-            'id', 'lesson_pack', 'task_text', 'task_image', 'duration_seconds',
-            'order', 'is_active', 'assess_content', 'assess_grammar',
-            'assess_fluency', 'assess_pronunciation', 'max_content_score',
-            'max_grammar_score', 'max_fluency_score', 'max_pronunciation_score',
-            'max_total_score', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-    
-    def get_max_total_score(self, obj):
-        return obj.get_max_total_score()
-
-
-class StudentSpeakingRecordingSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
-    task_text = serializers.CharField(source='task.task_text', read_only=True)
-    
-    class Meta:
-        model = StudentSpeakingRecording
-        fields = [
-            'id', 'student', 'student_name', 'task', 'task_text', 'audio_file',
-            'transcribed_text', 'transcription_model', 'transcribed_at',
-            'content_score', 'grammar_score', 'fluency_score', 'pronunciation_score',
-            'total_score', 'ai_feedback', 'strengths', 'improvements',
-            'assessed_at', 'assessment_model', 'created_at', 'updated_at',
-        ]
-        read_only_fields = [
-            'transcribed_text', 'transcription_model', 'transcribed_at',
-            'content_score', 'grammar_score', 'fluency_score', 'pronunciation_score',
-            'total_score', 'ai_feedback', 'strengths', 'improvements',
-            'assessed_at', 'assessment_model', 'created_at', 'updated_at',
-        ]
-
-
-# ============================================
-# Progress Tracking Serializers
-# ============================================
-
-class StudentLessonPackProgressSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
-    lesson_pack_title = serializers.CharField(source='lesson_pack.title', read_only=True)
-    skill_type = serializers.CharField(source='lesson_pack.skill.skill_type', read_only=True)
-    
-    class Meta:
-        model = StudentLessonPackProgress
-        fields = [
-            'id', 'student', 'student_name', 'lesson_pack', 'lesson_pack_title',
-            'skill_type', 'is_completed', 'completed_at', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['completed_at', 'created_at', 'updated_at']
-
-
-class StudentLessonProgressSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
-    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
-    
-    class Meta:
-        model = StudentLessonProgress
-        fields = [
-            'id', 'student', 'student_name', 'lesson', 'lesson_title',
-            'is_completed', 'completed_at', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['completed_at', 'created_at', 'updated_at']
-
-
-class StudentPracticeExamAttemptSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
-    exam_title = serializers.CharField(source='practice_exam.title', read_only=True)
-    lesson_pack_title = serializers.CharField(source='practice_exam.lesson_pack.title', read_only=True)
-    
-    class Meta:
-        model = StudentPracticeExamAttempt
-        fields = [
-            'id', 'student', 'student_name', 'practice_exam', 'exam_title',
-            'lesson_pack_title', 'attempt_number', 'answers', 'score', 'passed',
-            'time_taken', 'started_at', 'submitted_at', 'created_at', 'updated_at',
-        ]
-        read_only_fields = ['started_at', 'created_at', 'updated_at']
-
-
-class StudentPracticeExamAttemptCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = StudentPracticeExamAttempt
-        fields = ['student', 'practice_exam', 'attempt_number']
-    
-    def validate(self, data):
-        if StudentPracticeExamAttempt.objects.filter(
-            student=data.get('student'),
-            practice_exam=data.get('practice_exam'),
-            attempt_number=data.get('attempt_number')
-        ).exists():
-            raise serializers.ValidationError("هذا الطالب قد قام بهذه المحاولة من قبل")
-        return data
-
-
-def serialize_cloudinary(value):
-    if value is None:
-        return None
-    if hasattr(value, 'url'):
-        return value.url
-    return str(value) if value else None
-
-
-# ============================================
-# IELTS Lesson Detail with Questions
-# ============================================
-
-class IELTSLessonQuestionSerializer(serializers.Serializer):
-    id = serializers.IntegerField(read_only=True)
+class VocabularyQuestionIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
     question_text = serializers.CharField()
-    question_image = serializers.SerializerMethodField()
+    question_image = serializers.URLField(required=False, allow_null=True)
     choice_a = serializers.CharField()
     choice_b = serializers.CharField()
     choice_c = serializers.CharField()
     choice_d = serializers.CharField()
     correct_answer = serializers.CharField()
-    explanation = serializers.CharField(allow_null=True)
+    explanation = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
-    order = serializers.IntegerField()
-
-    def get_question_image(self, obj):
-        if obj.question_image:
-            return obj.question_image.url
-        return None
 
 
-class IELTSLessonDetailWithQuestionsSerializer(serializers.ModelSerializer):
-    skill_type = serializers.CharField(source='lesson_pack.skill.skill_type', read_only=True)
-    content = serializers.SerializerMethodField()
-    questions = serializers.SerializerMethodField()
-    questions_count = serializers.SerializerMethodField()
+class GrammarQuestionIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
+    question_text = serializers.CharField()
+    question_image = serializers.URLField(required=False, allow_null=True)
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
 
-    class Meta:
-        model = IELTSLesson
-        fields = [
-            'id', 'lesson_pack', 'skill_type', 'title', 'description',
-            'order', 'is_active', 'content', 'questions', 'questions_count',
-            'created_at', 'updated_at',
-        ]
 
-    def get_content(self, obj):
-        """
-        ✅ Fixed: يستخدم .filter() بدل getattr() عشان يشتغل بغض النظر عن related_name
-        """
-        skill_type = obj.lesson_pack.skill.skill_type
+class ReadingQuestionIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
+    question_text = serializers.CharField()
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
 
-        if skill_type == 'READING':
-            content = ReadingLessonContent.objects.filter(lesson=obj).first()
-            return ReadingLessonContentSerializer(content).data if content else None
 
-        elif skill_type == 'WRITING':
-            content = WritingLessonContent.objects.filter(lesson=obj).first()
-            return WritingLessonContentSerializer(content).data if content else None
+class ReadingPassageIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    passage_text = serializers.CharField()
+    passage_image = serializers.URLField(required=False, allow_null=True)
+    source = serializers.CharField(required=False, allow_null=True)
+    questions = ReadingQuestionIELTSSerializer(many=True)
+    difficulty = serializers.CharField(required=False)  
 
-        elif skill_type == 'SPEAKING':
-            content = SpeakingLessonContent.objects.filter(lesson=obj).first()
-            return SpeakingLessonContentSerializer(content).data if content else None
 
-        elif skill_type == 'LISTENING':
-            content = ListeningLessonContent.objects.filter(lesson=obj).first()
-            return ListeningLessonContentSerializer(content).data if content else None
+# ============================================
+# Listening Serializers ← جديد
+# ============================================
 
-        return None
+class ListeningQuestionIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
+    question_text = serializers.CharField()
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
 
-    def get_questions(self, obj):
-        from sabr_questions.models import ReadingPassage, ListeningAudio, SpeakingVideo
 
-        skill_type = obj.lesson_pack.skill.skill_type
+class ListeningAudioIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    audio_file = serializers.URLField(required=False, allow_null=True)
+    transcript = serializers.CharField(required=False, allow_null=True)
+    duration = serializers.IntegerField(required=False, allow_null=True)
+    questions = ListeningQuestionIELTSSerializer(many=True)
+    difficulty = serializers.CharField(required=False)  
 
-        if skill_type == 'READING':
-            passage = ReadingPassage.objects.filter(
-                ielts_lesson=obj, is_active=True
-            ).first()
-            if not passage:
-                return []
-            questions = passage.questions.filter(is_active=True).order_by('order', 'id')
-            return IELTSLessonQuestionSerializer(questions, many=True).data
 
-        elif skill_type == 'LISTENING':
-            audio = ListeningAudio.objects.filter(
-                ielts_lesson=obj, is_active=True
-            ).first()
-            if not audio:
-                return []
-            questions = audio.questions.filter(is_active=True).order_by('order', 'id')
-            return IELTSLessonQuestionSerializer(questions, many=True).data
+# ============================================
+# Writing Serializer
+# ============================================
 
-        elif skill_type == 'SPEAKING':
-            video = SpeakingVideo.objects.filter(
-                ielts_lesson=obj, is_active=True
-            ).first()
-            if not video:
-                return []
-            questions = video.questions.filter(is_active=True).order_by('order', 'id')
-            return IELTSLessonQuestionSerializer(questions, many=True).data
+class WritingQuestionIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    question_text = serializers.CharField()
+    question_image = serializers.URLField(required=False, allow_null=True)
+    min_words = serializers.IntegerField()
+    max_words = serializers.IntegerField()
+    sample_answer = serializers.CharField(required=False, allow_null=True)
+    rubric = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)  
 
-        elif skill_type == 'WRITING':
-            from sabr_questions.models import WritingQuestion
-            question = WritingQuestion.objects.filter(
-                ielts_lesson=obj,
-                is_active=True
-            ).first()
-            if not question:
-                return []
-            return [{
-                'id': question.id,
-                'title': question.title,
-                'question_text': question.question_text,
-                'min_words': question.min_words,
-                'max_words': question.max_words,
-                'sample_answer': question.sample_answer,
-                'rubric': question.rubric,
-                'points': question.points,
-                'pass_threshold': question.pass_threshold,
-            }]
+# SPEAKING
 
-        elif skill_type in ['VOCABULARY', 'GRAMMAR']:
-            if skill_type == 'VOCABULARY':
-                from sabr_questions.models import VocabularyQuestion
-                questions = VocabularyQuestion.objects.filter(
-                    ielts_lesson=obj, is_active=True
-                ).order_by('order', 'id')
-            else:
-                from sabr_questions.models import GrammarQuestion
-                questions = GrammarQuestion.objects.filter(
-                    ielts_lesson=obj, is_active=True
-                ).order_by('order', 'id')
-            return IELTSLessonQuestionSerializer(questions, many=True).data
+class SpeakingQuestionIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    question_text = serializers.CharField()
+    choice_a = serializers.CharField()
+    choice_b = serializers.CharField()
+    choice_c = serializers.CharField()
+    choice_d = serializers.CharField()
+    correct_answer = serializers.CharField()
+    explanation = serializers.CharField(required=False, allow_null=True)
+    points = serializers.IntegerField()
+    difficulty = serializers.CharField(required=False)
 
-        return []
 
-    def get_questions_count(self, obj):
-        return len(self.get_questions(obj))
+class SpeakingVideoIELTSSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    video_file = serializers.URLField(required=False, allow_null=True)
+    description = serializers.CharField(required=False, allow_null=True)
+    duration = serializers.IntegerField(required=False, allow_null=True)
+    thumbnail = serializers.URLField(required=False, allow_null=True)
+    questions = SpeakingQuestionIELTSSerializer(many=True)
+    difficulty = serializers.CharField(required=False)

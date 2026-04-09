@@ -1,350 +1,226 @@
 from django.contrib import admin
-from .models import (
-    IELTSSkill,
-    LessonPack,
-    IELTSLesson,
-    ReadingLessonContent,
-    WritingLessonContent,
-    SpeakingLessonContent,
-    ListeningLessonContent,
-    IELTSPracticeExam,
-    SpeakingRecordingTask,
-    StudentSpeakingRecording,
-    StudentLessonPackProgress,
-    StudentLessonProgress,
-    StudentPracticeExamAttempt,
-)
-
+from django.utils.html import format_html
+from .models import IELTSSkill, StudentIELTSProgress, StudentIELTSQuestionView
+from .ai_models import ExtractedBook,ExtractedMedia,AIGenerationJob
 
 # ============================================
-# Inline Admin Classes
-# ============================================
-
-class LessonPackInline(admin.TabularInline):
-    model = LessonPack
-    extra = 0
-    fields = ['title', 'order', 'is_active']
-    show_change_link = True
-
-
-class IELTSLessonInline(admin.TabularInline):
-    model = IELTSLesson
-    extra = 0
-    fields = ['title', 'order', 'is_active']
-    show_change_link = True
-
-
-class SpeakingRecordingTaskInline(admin.TabularInline):
-    model = SpeakingRecordingTask
-    extra = 0
-    fields = ['task_text', 'duration_seconds', 'order', 'is_active']
-    show_change_link = True
-
-
-# ============================================
-# Admin Classes
+# IELTS Skill Admin
 # ============================================
 
 @admin.register(IELTSSkill)
 class IELTSSkillAdmin(admin.ModelAdmin):
-    list_display = ['skill_type', 'title', 'order', 'is_active', 'get_lesson_packs_count', 'created_at']
+    list_display = ['skill_icon', 'skill_type_badge', 'title', 'total_questions', 'order', 'is_active']
     list_filter = ['skill_type', 'is_active']
-    search_fields = ['title', 'description']
+    search_fields = ['title', 'skill_type']
     ordering = ['order', 'skill_type']
-    
+    list_editable = ['order', 'is_active']
+
     fieldsets = (
-        ('Basic Information', {
+        ('معلومات المهارة', {
             'fields': ('skill_type', 'title', 'description', 'icon')
         }),
-        ('Display Settings', {
+        ('الترتيب والتفعيل', {
             'fields': ('order', 'is_active')
         }),
     )
-    
-    inlines = [LessonPackInline]
-    
-    def get_lesson_packs_count(self, obj):
-        return obj.get_lesson_packs_count()
-    get_lesson_packs_count.short_description = 'Lesson Packs'
 
-
-@admin.register(LessonPack)
-class LessonPackAdmin(admin.ModelAdmin):
-    list_display = ['title', 'skill', 'order', 'is_active', 'exam_time_limit', 'exam_passing_score', 'get_lessons_count']
-    list_filter = ['skill', 'is_active']
-    search_fields = ['title', 'description']
-    ordering = ['skill__order', 'order']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('skill', 'title', 'description')
-        }),
-        ('Exam Settings', {
-            'fields': ('exam_time_limit', 'exam_passing_score')
-        }),
-        ('Display Settings', {
-            'fields': ('order', 'is_active')
-        }),
-    )
-    
-    inlines = [IELTSLessonInline, SpeakingRecordingTaskInline]
-    
-    def get_lessons_count(self, obj):
-        return obj.get_lessons_count()
-    get_lessons_count.short_description = 'Lessons'
-
-
-@admin.register(IELTSLesson)
-class IELTSLessonAdmin(admin.ModelAdmin):
-    list_display = ['title', 'lesson_pack', 'get_skill_type', 'order', 'is_active', 'created_at']
-    list_filter = ['lesson_pack__skill', 'is_active']
-    search_fields = ['title', 'description']
-    ordering = ['lesson_pack__order', 'order']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('lesson_pack', 'title', 'description')
-        }),
-        ('Display Settings', {
-            'fields': ('order', 'is_active')
-        }),
-    )
-    
-    def get_skill_type(self, obj):
-        return obj.lesson_pack.skill.get_skill_type_display()
-    get_skill_type.short_description = 'Skill'
-
-
-@admin.register(ReadingLessonContent)
-class ReadingLessonContentAdmin(admin.ModelAdmin):
-    list_display = ['lesson', 'get_lesson_pack', 'created_at']
-    list_filter = ['lesson__lesson_pack']
-    search_fields = ['lesson__title', 'reading_text']
-    
-    fieldsets = (
-        ('Lesson', {
-            'fields': ('lesson',)
-        }),
-        ('Content', {
-            'fields': ('reading_text', 'explanation', 'vocabulary_words', 'examples')
-        }),
-        ('Resources', {
-            'fields': ('video_url', 'resources')
-        }),
-    )
-    
-    def get_lesson_pack(self, obj):
-        return obj.lesson.lesson_pack.title
-    get_lesson_pack.short_description = 'Lesson Pack'
-
-
-@admin.register(WritingLessonContent)
-class WritingLessonContentAdmin(admin.ModelAdmin):
-    list_display = ['lesson', 'get_lesson_pack', 'created_at']
-    list_filter = ['lesson__lesson_pack']
-    search_fields = ['lesson__title', 'sample_texts']
-    
-    fieldsets = (
-        ('Lesson', {
-            'fields': ('lesson',)
-        }),
-        ('Content', {
-            'fields': ('sample_texts', 'writing_instructions', 'tips', 'examples')
-        }),
-        ('Resources', {
-            'fields': ('video_url',)
-        }),
-    )
-    
-    def get_lesson_pack(self, obj):
-        return obj.lesson.lesson_pack.title
-    get_lesson_pack.short_description = 'Lesson Pack'
-
-
-@admin.register(SpeakingLessonContent)
-class SpeakingLessonContentAdmin(admin.ModelAdmin):
-    list_display = ['lesson', 'get_lesson_pack', 'created_at']
-    list_filter = ['lesson__lesson_pack']
-    search_fields = ['lesson__title']
-    
-    fieldsets = (
-        ('Lesson', {
-            'fields': ('lesson',)
-        }),
-        ('Media', {
-            'fields': ('video_file', 'audio_examples')
-        }),
-        ('Content', {
-            'fields': ('dialogue_texts', 'useful_phrases', 'pronunciation_tips')
-        }),
-    )
-    
-    def get_lesson_pack(self, obj):
-        return obj.lesson.lesson_pack.title
-    get_lesson_pack.short_description = 'Lesson Pack'
-
-
-@admin.register(ListeningLessonContent)
-class ListeningLessonContentAdmin(admin.ModelAdmin):
-    list_display = ['lesson', 'get_lesson_pack', 'created_at']
-    list_filter = ['lesson__lesson_pack']
-    search_fields = ['lesson__title', 'transcript']
-    
-    fieldsets = (
-        ('Lesson', {
-            'fields': ('lesson',)
-        }),
-        ('Audio', {
-            'fields': ('audio_file',)
-        }),
-        ('Content', {
-            'fields': ('transcript', 'vocabulary_explanation', 'listening_exercises', 'tips')
-        }),
-    )
-    
-    def get_lesson_pack(self, obj):
-        return obj.lesson.lesson_pack.title
-    get_lesson_pack.short_description = 'Lesson Pack'
-
-
-@admin.register(IELTSPracticeExam)
-class IELTSPracticeExamAdmin(admin.ModelAdmin):
-    list_display = ['title', 'lesson_pack', 'get_questions_count', 'created_at']
-    list_filter = ['lesson_pack__skill']
-    search_fields = ['title', 'instructions']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('lesson_pack', 'title', 'instructions')
-        }),
-    )
-    
-    def get_questions_count(self, obj):
-        return obj.get_questions_count()
-    get_questions_count.short_description = 'Questions'
-
-
-@admin.register(SpeakingRecordingTask)
-class SpeakingRecordingTaskAdmin(admin.ModelAdmin):
-    list_display = ['get_short_task', 'lesson_pack', 'duration_seconds', 'order', 'is_active', 'get_max_total_score']
-    list_filter = ['lesson_pack', 'is_active']
-    search_fields = ['task_text']
-    ordering = ['lesson_pack', 'order']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('lesson_pack', 'task_text', 'task_image', 'duration_seconds')
-        }),
-        ('Assessment Configuration', {
-            'fields': (
-                'assess_content', 'max_content_score',
-                'assess_grammar', 'max_grammar_score',
-                'assess_fluency', 'max_fluency_score',
-                'assess_pronunciation', 'max_pronunciation_score'
+    def skill_icon(self, obj):
+        if obj.icon:
+            return format_html(
+                '<img src="{}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;" />',
+                obj.icon.url
             )
-        }),
-        ('Display Settings', {
-            'fields': ('order', 'is_active')
-        }),
-    )
-    
-    def get_short_task(self, obj):
-        return obj.task_text[:50] + '...' if len(obj.task_text) > 50 else obj.task_text
-    get_short_task.short_description = 'Task'
-    
-    def get_max_total_score(self, obj):
-        return obj.get_max_total_score()
-    get_max_total_score.short_description = 'Max Score'
+        icons = {
+            'VOCABULARY': '📚',
+            'GRAMMAR': '📝',
+            'READING': '📖',
+            'WRITING': '✏️',
+        }
+        icon = icons.get(obj.skill_type, '❓')
+        colors = {
+            'VOCABULARY': '#6366f1',
+            'GRAMMAR': '#8b5cf6',
+            'READING': '#0ea5e9',
+            'WRITING': '#10b981',
+        }
+        color = colors.get(obj.skill_type, '#94a3b8')
+        return format_html(
+            '<div style="width:36px;height:36px;border-radius:8px;background:{};'
+            'display:flex;align-items:center;justify-content:center;font-size:18px;">{}</div>',
+            color, icon
+        )
+    skill_icon.short_description = ''
+
+    def skill_type_badge(self, obj):
+        colors = {
+            'VOCABULARY': ('#6366f1', '📚 Vocabulary'),
+            'GRAMMAR':    ('#8b5cf6', '📝 Grammar'),
+            'READING':    ('#0ea5e9', '📖 Reading'),
+            'WRITING':    ('#10b981', '✏️ Writing'),
+        }
+        color, label = colors.get(obj.skill_type, ('#94a3b8', obj.skill_type))
+        return format_html(
+            '<span style="background:{};color:#fff;padding:3px 12px;'
+            'border-radius:20px;font-size:11px;font-weight:600;">{}</span>',
+            color, label
+        )
+    skill_type_badge.short_description = 'النوع'
+
+    def total_questions(self, obj):
+        count = obj.get_total_questions_count()
+        color = '#10b981' if count > 0 else '#ef4444'
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 10px;'
+            'border-radius:12px;font-size:12px;font-weight:600;">{} سؤال</span>',
+            color, count
+        )
+    total_questions.short_description = 'عدد الأسئلة'
 
 
-@admin.register(StudentSpeakingRecording)
-class StudentSpeakingRecordingAdmin(admin.ModelAdmin):
-    list_display = ['student', 'get_short_task', 'total_score', 'assessed_at', 'created_at']
-    list_filter = ['task__lesson_pack', 'assessed_at']
-    search_fields = ['student__username', 'student__email', 'task__task_text']
-    ordering = ['-created_at']
-    readonly_fields = ['created_at', 'updated_at']
-    
+# ============================================
+# Student IELTS Progress Admin
+# ============================================
+
+@admin.register(StudentIELTSProgress)
+class StudentIELTSProgressAdmin(admin.ModelAdmin):
+    list_display = ['student_info', 'skill_badge', 'viewed_questions_count', 'total_score', 'progress_bar']
+    list_filter = ['skill__skill_type']
+    search_fields = ['student__email', 'student__full_name']
+    ordering = ['-total_score']
+    readonly_fields = [
+        'student', 'skill', 'viewed_questions_count',
+        'total_score', 'progress_display', 'created_at', 'updated_at'
+    ]
+
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('student', 'task', 'audio_file')
+        ('معلومات الطالب', {
+            'fields': ('student', 'skill')
         }),
-        ('Transcription', {
-            'fields': ('transcribed_text', 'transcription_model', 'transcribed_at')
+        ('الإحصائيات', {
+            'fields': ('viewed_questions_count', 'total_score', 'progress_display')
         }),
-        ('Assessment Scores', {
-            'fields': (
-                'content_score', 'grammar_score',
-                'fluency_score', 'pronunciation_score',
-                'total_score'
-            )
-        }),
-        ('Feedback', {
-            'fields': ('ai_feedback', 'strengths', 'improvements')
-        }),
-        ('Meta', {
-            'fields': ('assessment_model', 'assessed_at', 'created_at', 'updated_at')
-        }),
-    )
-    
-    def get_short_task(self, obj):
-        return obj.task.task_text[:30] + '...' if len(obj.task.task_text) > 30 else obj.task.task_text
-    get_short_task.short_description = 'Task'
-
-
-@admin.register(StudentLessonPackProgress)
-class StudentLessonPackProgressAdmin(admin.ModelAdmin):
-    list_display = ['student', 'lesson_pack', 'is_completed', 'completed_at', 'created_at']
-    list_filter = ['lesson_pack__skill', 'is_completed']
-    search_fields = ['student__username', 'student__email', 'lesson_pack__title']
-    ordering = ['-created_at']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('student', 'lesson_pack')
-        }),
-        ('Progress', {
-            'fields': ('is_completed', 'completed_at')
+        ('التواريخ', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
         }),
     )
 
+    def student_info(self, obj):
+        initials = obj.student.full_name[:2].upper() if obj.student.full_name else obj.student.email[:2].upper()
+        colors = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#10b981']
+        color = colors[hash(obj.student.email) % len(colors)]
+        return format_html(
+            '<div style="display:flex;align-items:center;gap:8px;">'
+            '<div style="width:32px;height:32px;border-radius:50%;background:{};'
+            'display:flex;align-items:center;justify-content:center;'
+            'color:#fff;font-weight:700;font-size:12px;">{}</div>'
+            '<div><div style="font-weight:600;font-size:13px;">{}</div>'
+            '<div style="font-size:11px;color:#64748b;">{}</div></div>'
+            '</div>',
+            color, initials,
+            obj.student.full_name or '', obj.student.email
+        )
+    student_info.short_description = 'الطالب'
 
-@admin.register(StudentLessonProgress)
-class StudentLessonProgressAdmin(admin.ModelAdmin):
-    list_display = ['student', 'lesson', 'is_completed', 'completed_at', 'created_at']
-    list_filter = ['lesson__lesson_pack', 'is_completed']
-    search_fields = ['student__username', 'student__email', 'lesson__title']
-    ordering = ['-created_at']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('student', 'lesson')
-        }),
-        ('Progress', {
-            'fields': ('is_completed', 'completed_at')
-        }),
-    )
+    def skill_badge(self, obj):
+        colors = {
+            'VOCABULARY': ('#6366f1', '📚 Vocabulary'),
+            'GRAMMAR':    ('#8b5cf6', '📝 Grammar'),
+            'READING':    ('#0ea5e9', '📖 Reading'),
+            'WRITING':    ('#10b981', '✏️ Writing'),
+        }
+        color, label = colors.get(obj.skill.skill_type, ('#94a3b8', obj.skill.title))
+        return format_html(
+            '<span style="background:{};color:#fff;padding:3px 10px;'
+            'border-radius:20px;font-size:11px;font-weight:600;">{}</span>',
+            color, label
+        )
+    skill_badge.short_description = 'المهارة'
+
+    def progress_bar(self, obj):
+        pct = obj.calculate_progress_percentage()
+        color = '#10b981' if pct >= 70 else '#f59e0b' if pct >= 30 else '#6366f1'
+        return format_html(
+            '<div style="display:flex;align-items:center;gap:8px;min-width:150px;">'
+            '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:8px;">'
+            '<div style="background:{};width:{}%;height:8px;border-radius:4px;"></div>'
+            '</div>'
+            '<span style="font-size:11px;font-weight:600;color:{}">{:.0f}%</span>'
+            '</div>',
+            color, min(pct, 100), color, pct
+        )
+    progress_bar.short_description = 'التقدم'
+
+    def progress_display(self, obj):
+        pct = obj.calculate_progress_percentage()
+        total = obj.skill.get_total_questions_count()
+        color = '#10b981' if pct >= 70 else '#f59e0b' if pct >= 30 else '#6366f1'
+        return format_html(
+            '<div style="max-width:400px;">'
+            '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
+            '<span style="font-weight:600;">التقدم الكلي</span>'
+            '<span style="font-weight:700;color:{}">{:.1f}%</span>'
+            '</div>'
+            '<div style="background:#f1f5f9;border-radius:6px;height:12px;">'
+            '<div style="background:{};width:{}%;height:12px;border-radius:6px;"></div>'
+            '</div>'
+            '<div style="margin-top:6px;font-size:12px;color:#64748b;">'
+            '{} من {} سؤال</div>'
+            '</div>',
+            color, pct, color, min(pct, 100),
+            obj.viewed_questions_count, total
+        )
+    progress_display.short_description = 'تفاصيل التقدم'
 
 
-@admin.register(StudentPracticeExamAttempt)
-class StudentPracticeExamAttemptAdmin(admin.ModelAdmin):
-    list_display = ['student', 'practice_exam', 'attempt_number', 'score', 'passed', 'submitted_at', 'started_at']
-    list_filter = ['practice_exam__lesson_pack', 'passed', 'submitted_at']
-    search_fields = ['student__username', 'student__email', 'practice_exam__title']
-    ordering = ['-started_at']
-    readonly_fields = ['started_at', 'created_at', 'updated_at']
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('student', 'practice_exam', 'attempt_number')
-        }),
-        ('Answers', {
-            'fields': ('answers',)
-        }),
-        ('Results', {
-            'fields': ('score', 'passed', 'time_taken')
-        }),
-        ('Timestamps', {
-            'fields': ('started_at', 'submitted_at', 'created_at', 'updated_at')
-        }),
-    )
+
+# ============================================
+# Student IELTS Question View Admin
+# ============================================
+
+@admin.register(StudentIELTSQuestionView)
+class StudentIELTSQuestionViewAdmin(admin.ModelAdmin):
+    list_display = ['student_email', 'skill_badge', 'question_type_badge', 'question_id', 'viewed_at']
+    list_filter = ['question_type', 'skill__skill_type']
+    search_fields = ['student__email', 'student__full_name']
+    ordering = ['-viewed_at']
+    readonly_fields = ['student', 'skill', 'question_type', 'question_id', 'viewed_at', 'created_at', 'updated_at']
+    date_hierarchy = 'viewed_at'
+
+    def student_email(self, obj):
+        return format_html('<span style="font-weight:600;">{}</span>', obj.student.email)
+    student_email.short_description = 'الطالب'
+
+    def skill_badge(self, obj):
+        colors = {
+            'VOCABULARY': ('#6366f1', '📚'),
+            'GRAMMAR':    ('#8b5cf6', '📝'),
+            'READING':    ('#0ea5e9', '📖'),
+            'WRITING':    ('#10b981', '✏️'),
+        }
+        color, icon = colors.get(obj.skill.skill_type, ('#94a3b8', '❓'))
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 10px;'
+            'border-radius:12px;font-size:11px;">{} {}</span>',
+            color, icon, obj.skill.title
+        )
+    skill_badge.short_description = 'المهارة'
+
+    def question_type_badge(self, obj):
+        colors = {
+            'VOCABULARY': ('#6366f1', 'Vocabulary'),
+            'GRAMMAR':    ('#8b5cf6', 'Grammar'),
+            'READING':    ('#0ea5e9', 'Reading'),
+            'WRITING':    ('#10b981', 'Writing'),
+        }
+        color, label = colors.get(obj.question_type, ('#94a3b8', obj.question_type))
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 10px;'
+            'border-radius:12px;font-size:11px;font-weight:600;">{}</span>',
+            color, label
+        )
+    question_type_badge.short_description = 'نوع السؤال'
+
+admin.site.register(ExtractedBook)
+admin.site.register(ExtractedMedia)
+admin.site.register(AIGenerationJob)
