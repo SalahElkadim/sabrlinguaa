@@ -48,7 +48,9 @@ INSTALLED_APPS = [
     'ielts',
     'step',
     'booking',
+    'general',
     'django_celery_results',
+    
 
 ]
 

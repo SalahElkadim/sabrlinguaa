@@ -192,6 +192,14 @@ class UsageTypeMixin(models.Model):
         verbose_name="IELTS Skill",
         help_text="لأسئلة IELTS (usage_type=IELTS)"
     )
+    general_skill = models.ForeignKey(
+    'general.GeneralSkill',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='%(class)s_questions',
+    verbose_name="General Skill",
+    )
     
     class Meta:
         abstract = True

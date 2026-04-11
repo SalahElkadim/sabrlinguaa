@@ -11,6 +11,7 @@ urlpatterns = [
     path('ielts/', include('ielts.urls')),
     path('step/', include('step.urls')),
     path('booking/', include('booking.urls')),
+    path('general/', include('general.urls', namespace='general')),
 
 
 
