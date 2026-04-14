@@ -37,10 +37,12 @@ logger = logging.getLogger(__name__)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_skills(request):
-    """
-    GET /api/ielts/skills/
-    """
-    skills = IELTSSkill.objects.filter(is_active=True).order_by('order')
+    include_inactive = request.query_params.get('include_inactive', 'true')
+    if include_inactive == 'false':
+        skills = IELTSSkill.objects.filter(is_active=True).order_by('order')
+    else:
+        skills = IELTSSkill.objects.all().order_by('order')
+    
     serializer = IELTSSkillListSerializer(skills, many=True)
     return Response({
         'total_skills': skills.count(),
@@ -993,7 +995,7 @@ def my_progress(request):
     total_score = sum(p.total_score for p in progress_records)
     total_viewed = sum(p.viewed_questions_count for p in progress_records)
 
-    all_skills = IELTSSkill.objects.filter(is_active=True).exclude(skill_type='GENERAL_PATH')
+    all_skills = IELTSSkill.objects.filter().exclude(skill_type='GENERAL_PATH')
     total_available = sum(skill.get_total_questions_count() for skill in all_skills)
 
 

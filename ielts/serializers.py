@@ -26,7 +26,8 @@ class IELTSSkillListSerializer(serializers.ModelSerializer):
             'icon',
             'order',
             'total_questions',
-            'child_skills',  # ← جديد
+            'child_skills', 
+            'is_active', # ← جديد
         ]
 
     def get_total_questions(self, obj):
@@ -35,7 +36,7 @@ class IELTSSkillListSerializer(serializers.ModelSerializer):
     # ← جديد
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
-            children = obj.child_skills.filter(is_active=True).order_by('order')
+            children = obj.child_skills.filter().order_by('order')
             return IELTSSkillListSerializer(children, many=True).data
         return None
 
@@ -59,7 +60,7 @@ class IELTSSkillDetailSerializer(serializers.ModelSerializer):
     # ← جديد
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
-            children = obj.child_skills.filter(is_active=True).order_by('order')
+            children = obj.child_skills.filter().order_by('order')
             return IELTSSkillListSerializer(children, many=True).data
         return None
 
