@@ -13,7 +13,7 @@ from .models import (
     StudentIELTSQuestionView,StudentIELTSQuestionAttempt
 )
 from sabr_questions.models import SpeakingVideo
-
+import math
 from .serializers import (
     IELTSSkillListSerializer,
     IELTSSkillDetailSerializer,
@@ -49,6 +49,46 @@ def list_skills(request):
         'skills': serializer.data
     }, status=status.HTTP_200_OK)
 
+def _get_ordered_questions(queryset, order_type):
+    """
+    ترتيب الأسئلة حسب النوع المختار في المهارة.
+    """
+    if order_type == 'RANDOM':
+        return queryset.order_by('?')
+
+    elif order_type == 'SEQUENTIAL':
+        return queryset.annotate(
+            diff_order=Case(
+                When(difficulty='EASY', then=Value(1)),
+                When(difficulty='MEDIUM', then=Value(2)),
+                When(difficulty='HARD', then=Value(3)),
+                default=Value(2),
+                output_field=IntegerField()
+            )
+        ).order_by('diff_order', 'order', 'id')
+
+    elif order_type == 'CYCLIC':
+        # جيب الكل مرتبين حسب الصعوبة
+        easy   = list(queryset.filter(difficulty='EASY').order_by('order', 'id'))
+        medium = list(queryset.filter(difficulty='MEDIUM').order_by('order', 'id'))
+        hard   = list(queryset.filter(difficulty='HARD').order_by('order', 'id'))
+        
+        result = []
+        chunk = 3
+        max_rounds = max(
+            math.ceil(len(easy) / chunk),
+            math.ceil(len(medium) / chunk),
+            math.ceil(len(hard) / chunk),
+        )
+        for i in range(max_rounds):
+            result += easy[i*chunk : (i+1)*chunk]
+            result += medium[i*chunk : (i+1)*chunk]
+            result += hard[i*chunk : (i+1)*chunk]
+        
+        # رجّع list مش queryset — الـ Paginator يقبل الاتنين
+        return result
+
+    return queryset.order_by('order', 'id')
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -553,14 +593,7 @@ def create_writing_question(request):
 # ============================================
 
 
-# Helper لترتيب الصعوبة: EASY=1, MEDIUM=2, HARD=3
-DIFFICULTY_ORDER = Case(
-    When(difficulty='EASY', then=Value(1)),
-    When(difficulty='MEDIUM', then=Value(2)),
-    When(difficulty='HARD', then=Value(3)),
-    default=Value(2),
-    output_field=IntegerField()
-)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -623,9 +656,8 @@ def get_skill_questions(request, skill_id):
         }
 
     if skill.skill_type == 'VOCABULARY':
-        questions = VocabularyQuestion.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = VocabularyQuestion.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -642,9 +674,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'GRAMMAR':
-        questions = GrammarQuestion.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = GrammarQuestion.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -661,9 +692,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'READING':
-        passages = ReadingPassage.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = ReadingPassage.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        passages = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(passages, page_size)
         page_obj = paginator.get_page(page)
         for passage in page_obj:
@@ -688,9 +718,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'LISTENING':
-        audios = ListeningAudio.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = ListeningAudio.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        audios = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(audios, page_size)
         page_obj = paginator.get_page(page)
         for audio in page_obj:
@@ -714,10 +743,8 @@ def get_skill_questions(request, skill_id):
                 'difficulty': audio.difficulty,
             })
     elif skill.skill_type == 'SPEAKING':
-
-        videos = SpeakingVideo.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = SpeakingVideo.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        videos = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(videos, page_size)
         page_obj = paginator.get_page(page)
         for video in page_obj:
@@ -743,9 +770,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'WRITING':
-        questions = WritingQuestion.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = WritingQuestion.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -778,9 +804,9 @@ def get_skill_questions(request, skill_id):
                 attempts_map.setdefault((a.question_type, a.question_id), a)
 
         # Vocabulary
-        vocab_qs = VocabularyQuestion.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+
+        qs = VocabularyQuestion.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        vocab_qs = _get_ordered_questions(qs, skill.question_order_type)
         for q in vocab_qs:
             questions_data.append({
                 'id': q.id, 'type': 'VOCABULARY',
@@ -795,9 +821,9 @@ def get_skill_questions(request, skill_id):
             })
 
         # Grammar
-        grammar_qs = GrammarQuestion.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).order_by(DIFFICULTY_ORDER, 'order', 'id')
+
+        qs = GrammarQuestion.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        grammar_qs = _get_ordered_questions(qs, skill.question_order_type)
         for q in grammar_qs:
             questions_data.append({
                 'id': q.id, 'type': 'GRAMMAR',
@@ -812,9 +838,9 @@ def get_skill_questions(request, skill_id):
             })
 
         # Reading
-        passages = ReadingPassage.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+
+        qs = ReadingPassage.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        passages = _get_ordered_questions(qs, skill.question_order_type)
         for passage in passages:
             passage_questions = []
             for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
@@ -836,7 +862,8 @@ def get_skill_questions(request, skill_id):
                 'difficulty': passage.difficulty,
             })
         # Speaking
-        videos = SpeakingVideo.objects.filter(ielts_skill=skill, usage_type='IELTS', is_active=True).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = SpeakingVideo.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        videos = _get_ordered_questions(qs, skill.question_order_type)
         for video in videos:
             video_questions = []
             for q in video.questions.filter(is_active=True).order_by('order', 'id'):
@@ -859,9 +886,8 @@ def get_skill_questions(request, skill_id):
                 'difficulty': video.difficulty,
             })
         # Listening
-        audios = ListeningAudio.objects.filter(
-            ielts_skill=skill, usage_type='IELTS', is_active=True
-        ).prefetch_related('questions').order_by(DIFFICULTY_ORDER, 'order', 'id')
+        qs = ListeningAudio.objects.filter(general_skill=skill, usage_type='IELTS', is_active=True)
+        audios = _get_ordered_questions(qs, skill.question_order_type)
         for audio in audios:
             audio_questions = []
             for q in audio.questions.filter(is_active=True).order_by('order', 'id'):

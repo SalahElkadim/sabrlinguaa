@@ -46,6 +46,17 @@ class IELTSSkill(TimeStampedModel, OrderedModel):
         ('SPEAKING', 'Speaking'),
 
     ]
+    ORDER_TYPE_CHOICES = [
+        ('SEQUENTIAL', 'Sequential (Easy → Medium → Hard)'),
+        ('CYCLIC', 'Cyclic (3 Easy, 3 Medium, 3 Hard, repeat)'),
+        ('RANDOM', 'Random'),
+    ]
+    question_order_type = models.CharField(
+        max_length=20,
+        choices=ORDER_TYPE_CHOICES,
+        default='SEQUENTIAL',
+        verbose_name="طريقة ترتيب الأسئلة"
+    )
     
     skill_type = models.CharField(
         max_length=20,
