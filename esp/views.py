@@ -137,7 +137,7 @@ def list_skills(request, category_id):
     GET /api/esp/categories/{category_id}/skills/
     """
     category = get_object_or_404(EspCategory, id=category_id)
-    skills = EspSkill.objects.filter(category=category, is_active=True).order_by('order')
+    skills = EspSkill.objects.filter(category=category).order_by('order')
     serializer = EspSkillListSerializer(skills, many=True)
     return Response({
         'category': {'id': category.id, 'name': category.name},
@@ -1238,7 +1238,7 @@ def my_progress_by_category(request, category_id):
     category = get_object_or_404(EspCategory, id=category_id)
     student = request.user
 
-    skills = EspSkill.objects.filter(category=category, is_active=True)
+    skills = EspSkill.objects.filter(category=category)
     total_viewed = 0
     total_score = 0
     total_questions = 0

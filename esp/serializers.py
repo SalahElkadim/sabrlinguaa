@@ -61,7 +61,7 @@ class EspCategoryDetailSerializer(serializers.ModelSerializer):
         return obj.get_total_questions_count()
 
     def get_skills(self, obj):
-        skills = obj.skills.filter(is_active=True).order_by('order')
+        skills = obj.skills.filter().order_by('order')
         return EspSkillListSerializer(skills, many=True).data
 
 

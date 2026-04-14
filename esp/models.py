@@ -56,7 +56,7 @@ class EspCategory(TimeStampedModel, OrderedModel):
 
     def get_total_questions_count(self):
         total = 0
-        for skill in self.skills.filter(is_active=True):
+        for skill in self.skills.filter():
             total += skill.get_total_questions_count()
         return total
 
