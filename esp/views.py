@@ -1,6 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.utils import timezone
@@ -754,9 +751,8 @@ def get_skill_questions(request, skill_id):
     questions_data = []
 
     if skill.skill_type == 'VOCABULARY':
-        questions = VocabularyQuestion.objects.filter(
-            esp_skill=skill, usage_type='ESP', is_active=True
-        ).order_by(get_skill_questions, 'order', 'id')
+        qs = VocabularyQuestion.objects.filter(esp_skill=skill, usage_type='ESP', is_active=True)
+        questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -773,9 +769,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'GRAMMAR':
-        questions = GrammarQuestion.objects.filter(
-            esp_skill=skill, usage_type='ESP', is_active=True
-        ).order_by(get_skill_questions, 'order', 'id')
+        qs = GrammarQuestion.objects.filter(esp_skill=skill, usage_type='ESP', is_active=True)
+        questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -792,9 +787,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'READING':
-        passages = ReadingPassage.objects.filter(
-            esp_skill=skill, usage_type='ESP', is_active=True
-        ).prefetch_related('questions').order_by(get_skill_questions, 'order', 'id')
+        qs = ReadingPassage.objects.filter(esp_skill=skill, usage_type='ESP', is_active=True)
+        passages = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(passages, page_size)
         page_obj = paginator.get_page(page)
         for passage in page_obj:
@@ -819,9 +813,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'LISTENING':
-        audios = ListeningAudio.objects.filter(
-            esp_skill=skill, usage_type='ESP', is_active=True
-        ).prefetch_related('questions').order_by(get_skill_questions, 'order', 'id')
+        qs = ListeningAudio.objects.filter(esp_skill=skill, usage_type='ESP', is_active=True)
+        audios = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(audios, page_size)
         page_obj = paginator.get_page(page)
         for audio in page_obj:
@@ -846,9 +839,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'SPEAKING':
-        videos = SpeakingVideo.objects.filter(
-            esp_skill=skill, usage_type='ESP', is_active=True
-        ).prefetch_related('questions').order_by(get_skill_questions, 'order', 'id')
+        qs = SpeakingVideo.objects.filter(esp_skill=skill, usage_type='ESP', is_active=True)
+        videos = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(videos, page_size)
         page_obj = paginator.get_page(page)
         for video in page_obj:
@@ -874,9 +866,8 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'WRITING':
-        questions = WritingQuestion.objects.filter(
-            esp_skill=skill, usage_type='ESP', is_active=True
-        ).order_by(get_skill_questions, 'order', 'id')
+        qs = WritingQuestion.objects.filter(esp_skill=skill, usage_type='ESP', is_active=True)
+        questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
         for q in page_obj:
@@ -1242,7 +1233,7 @@ def my_progress(request):
     total_score = sum(p.total_score for p in progress_records)
     total_viewed = sum(p.viewed_questions_count for p in progress_records)
 
-    all_skills = EspSkill.objects.filter(is_active=True)
+    all_skills = EspSkill.objects.filter()
     total_available = sum(skill.get_total_questions_count() for skill in all_skills)
 
     overall_percentage = 0
