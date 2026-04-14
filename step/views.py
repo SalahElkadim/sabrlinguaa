@@ -656,7 +656,7 @@ def get_skill_questions(request, skill_id):
         }
 
     if skill.skill_type == 'VOCABULARY':
-        qs = VocabularyQuestion.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = VocabularyQuestion.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
@@ -674,7 +674,7 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'GRAMMAR':
-        qs = GrammarQuestion.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = GrammarQuestion.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
@@ -692,7 +692,7 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'READING':
-        qs = ReadingPassage.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = ReadingPassage.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         passages = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(passages, page_size)
         page_obj = paginator.get_page(page)
@@ -718,7 +718,7 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'LISTENING':
-        qs = ListeningAudio.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = ListeningAudio.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         audios = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(audios, page_size)
         page_obj = paginator.get_page(page)
@@ -743,7 +743,7 @@ def get_skill_questions(request, skill_id):
                 'difficulty': audio.difficulty,
             })
     elif skill.skill_type == 'SPEAKING':
-        qs = SpeakingVideo.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = SpeakingVideo.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         videos = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(videos, page_size)
         page_obj = paginator.get_page(page)
@@ -770,7 +770,7 @@ def get_skill_questions(request, skill_id):
             })
 
     elif skill.skill_type == 'WRITING':
-        qs = WritingQuestion.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = WritingQuestion.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         questions = _get_ordered_questions(qs, skill.question_order_type)
         paginator = Paginator(questions, page_size)
         page_obj = paginator.get_page(page)
@@ -805,7 +805,7 @@ def get_skill_questions(request, skill_id):
 
         # Vocabulary
 
-        qs = VocabularyQuestion.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = VocabularyQuestion.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         vocab_qs = _get_ordered_questions(qs, skill.question_order_type)
         for q in vocab_qs:
             questions_data.append({
@@ -822,7 +822,7 @@ def get_skill_questions(request, skill_id):
 
         # Grammar
 
-        qs = GrammarQuestion.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = GrammarQuestion.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         grammar_qs = _get_ordered_questions(qs, skill.question_order_type)
         for q in grammar_qs:
             questions_data.append({
@@ -839,7 +839,7 @@ def get_skill_questions(request, skill_id):
 
         # Reading
 
-        qs = ReadingPassage.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = ReadingPassage.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         passages = _get_ordered_questions(qs, skill.question_order_type)
         for passage in passages:
             passage_questions = []
@@ -862,7 +862,7 @@ def get_skill_questions(request, skill_id):
                 'difficulty': passage.difficulty,
             })
         # Speaking
-        qs = SpeakingVideo.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = SpeakingVideo.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         videos = _get_ordered_questions(qs, skill.question_order_type)
         for video in videos:
             video_questions = []
@@ -886,7 +886,7 @@ def get_skill_questions(request, skill_id):
                 'difficulty': video.difficulty,
             })
         # Listening
-        qs = ListeningAudio.objects.filter(general_skill=skill, usage_type='STEP', is_active=True)
+        qs = ListeningAudio.objects.filter(step_skill=skill, usage_type='STEP', is_active=True)
         audios = _get_ordered_questions(qs, skill.question_order_type)
         for audio in audios:
             audio_questions = []
