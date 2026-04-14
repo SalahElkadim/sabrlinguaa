@@ -120,6 +120,8 @@ class UsageTypeMixin(models.Model):
         ('IELTS', 'IELTS Exam'),
         ('IELTS_LESSON', 'IELTS Lesson'),   # ✅ جديد
         ('GENERAL', 'General Use'),
+        ('ESP', 'Esp'),
+
     ]
     
     usage_type = models.CharField(
@@ -200,6 +202,14 @@ class UsageTypeMixin(models.Model):
     related_name='%(class)s_questions',
     verbose_name="General Skill",
     )
+    esp_skill = models.ForeignKey(
+    'esp.EspSkill',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='%(class)s_questions',
+    verbose_name="Esp Skill",
+    )
     
     class Meta:
         abstract = True
@@ -228,6 +238,7 @@ class VocabularyQuestionSet(TimeStampedModel, OrderedModel):
         ('IELTS', 'IELTS Exam'),
         ('LEVEL', 'Level Test'),
         ('GENERAL', 'General Use'),
+        ('ESP', 'Esp'),
     ]
     
     usage_type = models.CharField(
@@ -311,6 +322,7 @@ class GrammarQuestionSet(TimeStampedModel, OrderedModel):
         ('IELTS', 'IELTS Exam'),
         ('LEVEL', 'Level Test'),
         ('GENERAL', 'General Use'),
+        ('ESP', 'Esp'),
     ]
     
     usage_type = models.CharField(
