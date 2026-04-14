@@ -27,6 +27,7 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
             'order',
             'total_questions',
             'child_skills',  # ← جديد
+            'is_active',
         ]
 
     def get_total_questions(self, obj):
@@ -35,7 +36,7 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
     # ← جديد
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
-            children = obj.child_skills.filter(is_active=True).order_by('order')
+            children = obj.child_skills.filter().order_by('order')
             return STEPSkillListSerializer(children, many=True).data
         return None
 
@@ -59,7 +60,7 @@ class STEPSkillDetailSerializer(serializers.ModelSerializer):
     # ← جديد
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
-            children = obj.child_skills.filter(is_active=True).order_by('order')
+            children = obj.child_skills.filter().order_by('order')
             return STEPSkillListSerializer(children, many=True).data
         return None
 

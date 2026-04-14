@@ -40,7 +40,7 @@ def list_skills(request):
     """
     GET /api/step/skills/
     """
-    skills = STEPSkill.objects.filter(is_active=True).order_by('order')
+    skills = STEPSkill.objects.filter().order_by('order')
     serializer = STEPSkillListSerializer(skills, many=True)
     return Response({
         'total_skills': skills.count(),
@@ -993,7 +993,7 @@ def my_progress(request):
     total_score = sum(p.total_score for p in progress_records)
     total_viewed = sum(p.viewed_questions_count for p in progress_records)
 
-    all_skills = STEPSkill.objects.filter(is_active=True).exclude(skill_type='GENERAL_PATH')
+    all_skills = STEPSkill.objects.filter().exclude(skill_type='GENERAL_PATH')
     total_available = sum(skill.get_total_questions_count() for skill in all_skills)
 
 
