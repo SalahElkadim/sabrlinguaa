@@ -86,6 +86,7 @@ class EspSkillListSerializer(serializers.ModelSerializer):
             'order',
             'is_active',
             'total_questions',
+            'question_order_type', 
         ]
 
     def get_total_questions(self, obj):
@@ -113,6 +114,7 @@ class EspSkillDetailSerializer(serializers.ModelSerializer):
             'total_questions',
             'created_at',
             'updated_at',
+            'question_order_type', 
         ]
         read_only_fields = ['created_at', 'updated_at']
 
