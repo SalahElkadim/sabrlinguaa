@@ -28,6 +28,7 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
             'total_questions',
             'child_skills',  # ← جديد
             'is_active',
+            'question_order_type', 
         ]
 
     def get_total_questions(self, obj):
@@ -50,7 +51,7 @@ class STEPSkillDetailSerializer(serializers.ModelSerializer):
             'id', 'skill_type', 'title', 'description',
             'icon', 'order', 'is_active', 'total_questions',
             'child_skills',  # ← جديد
-            'created_at', 'updated_at',
+            'created_at', 'updated_at','question_order_type', 
         ]
         read_only_fields = ['created_at', 'updated_at']
 
