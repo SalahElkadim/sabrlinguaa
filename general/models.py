@@ -78,6 +78,11 @@ class GeneralSkill(TimeStampedModel, OrderedModel):
         ('WRITING', 'Writing'),
         ('SPEAKING', 'Speaking'),
     ]
+    ORDER_TYPE_CHOICES = [
+        ('SEQUENTIAL', 'Sequential (Easy → Medium → Hard)'),
+        ('CYCLIC', 'Cyclic (3 Easy, 3 Medium, 3 Hard, repeat)'),
+        ('RANDOM', 'Random'),
+    ]
 
     category = models.ForeignKey(
         GeneralCategory,
@@ -97,6 +102,12 @@ class GeneralSkill(TimeStampedModel, OrderedModel):
         blank=True,
         null=True,
         folder='general/skill_icons',
+    )
+    question_order_type = models.CharField(
+        max_length=20,
+        choices=ORDER_TYPE_CHOICES,
+        default='SEQUENTIAL',
+        verbose_name="طريقة ترتيب الأسئلة"
     )
 
     class Meta:

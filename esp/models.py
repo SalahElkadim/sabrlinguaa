@@ -78,6 +78,20 @@ class EspSkill(TimeStampedModel, OrderedModel):
         ('WRITING', 'Writing'),
         ('SPEAKING', 'Speaking'),
     ]
+    ORDER_TYPE_CHOICES = [
+        ('SEQUENTIAL', 'Sequential (Easy → Medium → Hard)'),
+        ('CYCLIC', 'Cyclic (3 Easy, 3 Medium, 3 Hard, repeat)'),
+        ('RANDOM', 'Random'),
+    ]
+
+    # ... الـ fields الموجودة ...
+    
+    question_order_type = models.CharField(
+        max_length=20,
+        choices=ORDER_TYPE_CHOICES,
+        default='SEQUENTIAL',
+        verbose_name="طريقة ترتيب الأسئلة"
+    )
 
     category = models.ForeignKey(
         EspCategory,
