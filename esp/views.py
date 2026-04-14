@@ -56,7 +56,7 @@ def list_categories(request):
     """
     GET /api/esp/categories/
     """
-    categories = EspCategory.objects.filter(is_active=True).order_by('order')
+    categories = EspCategory.objects.filter().order_by('order')
     serializer = EspCategoryListSerializer(categories, many=True)
     return Response({
         'total_categories': categories.count(),

@@ -34,7 +34,7 @@ class EspCategoryListSerializer(serializers.ModelSerializer):
         return obj.get_total_questions_count()
 
     def get_skills_count(self, obj):
-        return obj.skills.filter(is_active=True).count()
+        return obj.skills.filter().count()
 
 
 class EspCategoryDetailSerializer(serializers.ModelSerializer):
