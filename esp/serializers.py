@@ -95,6 +95,8 @@ class EspSkillListSerializer(serializers.ModelSerializer):
 class EspSkillDetailSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
     category_name = serializers.CharField(source='category.name', read_only=True)
+    is_active = serializers.BooleanField()  # أضف السطر ده
+
 
     class Meta:
         model = EspSkill
