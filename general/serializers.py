@@ -34,7 +34,7 @@ class GeneralCategoryListSerializer(serializers.ModelSerializer):
         return obj.get_total_questions_count()
 
     def get_skills_count(self, obj):
-        return obj.skills.filter(is_active=True).count()
+        return obj.skills.filter().count()
 
 
 class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
@@ -61,7 +61,7 @@ class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
         return obj.get_total_questions_count()
 
     def get_skills(self, obj):
-        skills = obj.skills.filter(is_active=True).order_by('order')
+        skills = obj.skills.filter().order_by('order')
         return GeneralSkillListSerializer(skills, many=True).data
 
 

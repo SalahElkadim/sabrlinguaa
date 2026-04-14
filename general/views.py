@@ -53,7 +53,7 @@ def list_categories(request):
     """
     GET /api/general/categories/
     """
-    categories = GeneralCategory.objects.filter(is_active=True).order_by('order')
+    categories = GeneralCategory.objects.filter().order_by('order')
     serializer = GeneralCategoryListSerializer(categories, many=True)
     return Response({
         'total_categories': categories.count(),
@@ -134,7 +134,7 @@ def list_skills(request, category_id):
     GET /api/general/categories/{category_id}/skills/
     """
     category = get_object_or_404(GeneralCategory, id=category_id)
-    skills = GeneralSkill.objects.filter(category=category, is_active=True).order_by('order')
+    skills = GeneralSkill.objects.filter(category=category).order_by('order')
     serializer = GeneralSkillListSerializer(skills, many=True)
     return Response({
         'category': {'id': category.id, 'name': category.name},
@@ -1206,7 +1206,7 @@ def my_progress(request):
     total_score = sum(p.total_score for p in progress_records)
     total_viewed = sum(p.viewed_questions_count for p in progress_records)
 
-    all_skills = GeneralSkill.objects.filter(is_active=True)
+    all_skills = GeneralSkill.objects.filter()
     total_available = sum(skill.get_total_questions_count() for skill in all_skills)
 
     overall_percentage = 0
@@ -1235,7 +1235,7 @@ def my_progress_by_category(request, category_id):
     category = get_object_or_404(GeneralCategory, id=category_id)
     student = request.user
 
-    skills = GeneralSkill.objects.filter(category=category, is_active=True)
+    skills = GeneralSkill.objects.filter(category=category)
     total_viewed = 0
     total_score = 0
     total_questions = 0
