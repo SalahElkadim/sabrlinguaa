@@ -23,6 +23,7 @@ class TeacherListSerializer(serializers.ModelSerializer):
             'session_price',
             'is_active',
             'bio',
+            'average_rating','reviews_count',
         ]
 
     def get_profile_picture_url(self, obj):
@@ -32,24 +33,17 @@ class TeacherListSerializer(serializers.ModelSerializer):
 
 
 class TeacherDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer تفصيلي للمدرس
-    """
     profile_picture_url = serializers.SerializerMethodField()
+    average_rating = serializers.FloatField(read_only=True)
+    reviews_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Teacher
         fields = [
-            'id',
-            'name',
-            'profile_picture_url',
-            'subject',
-            'years_of_experience',
-            'session_price',
-            'bio',
-            'is_active',
-            'created_at',
-            'updated_at',
+            'id', 'name', 'profile_picture_url', 'subject',
+            'years_of_experience', 'session_price', 'bio',
+            'is_active', 'created_at', 'updated_at',
+            'average_rating', 'reviews_count',  # ← جديد
         ]
 
     def get_profile_picture_url(self, obj):
@@ -119,3 +113,45 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             'notes',
             'created_at',
         ]
+
+from .models import Teacher, Booking, Review
+
+from .models import Teacher, Booking, Review
+
+class ReviewSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ['id', 'student_name', 'rating', 'comment', 'created_at']
+        read_only_fields = ['id', 'student_name', 'created_at']
+
+
+class ReviewCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Review
+        fields = ['teacher', 'rating', 'comment']
+
+    def validate(self, data):
+        student = self.context['request'].user
+        teacher = data['teacher']
+
+        # الطالب لازم يكون عمل حجز مع المدرس ده
+        has_booking = Booking.objects.filter(
+            student=student, teacher=teacher
+        ).exists()
+        if not has_booking:
+            raise serializers.ValidationError(
+                "لا يمكنك تقييم مدرس لم تحجز معه حصة"
+            )
+
+        # مينفعش يقيّم أكتر من مرة
+        already_reviewed = Review.objects.filter(
+            student=student, teacher=teacher
+        ).exists()
+        if already_reviewed:
+            raise serializers.ValidationError(
+                "لقد قمت بتقييم هذا المدرس من قبل"
+            )
+
+        return data

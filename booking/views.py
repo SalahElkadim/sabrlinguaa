@@ -314,3 +314,59 @@ def list_all_bookings(request):
         'total_bookings': bookings.count(),
         'bookings': serializer.data
     }, status=status.HTTP_200_OK)
+
+from .models import Teacher, Booking, Review
+from .serializers import ReviewSerializer, ReviewCreateSerializer
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_review(request):
+    """
+    إنشاء تقييم جديد للمدرس
+    POST /booking/reviews/create/
+    Body: { "teacher": 1, "rating": 5, "comment": "ممتاز" }
+    """
+    serializer = ReviewCreateSerializer(
+        data=request.data,
+        context={'request': request}
+    )
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    review = serializer.save(student=request.user)
+    return Response(
+        ReviewSerializer(review).data,
+        status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_teacher_reviews(request, teacher_id):
+    """
+    عرض تقييمات مدرس معين
+    GET /booking/teachers/{teacher_id}/reviews/
+    """
+    teacher = get_object_or_404(Teacher, id=teacher_id)
+    reviews = teacher.reviews.select_related('student').all()
+    return Response({
+        'average_rating': teacher.average_rating,
+        'reviews_count': teacher.reviews_count,
+        'reviews': ReviewSerializer(reviews, many=True).data
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_review(request, teacher_id):
+    """
+    حذف تقييم الطالب لمدرس معين
+    DELETE /booking/teachers/{teacher_id}/reviews/delete/
+    """
+    review = get_object_or_404(
+        Review,
+        teacher_id=teacher_id,
+        student=request.user
+    )
+    review.delete()
+    return Response({'message': 'تم حذف التقييم بنجاح'})

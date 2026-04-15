@@ -24,4 +24,8 @@ urlpatterns = [
     # ADMIN
     # ============================================
     path('all/', views.list_all_bookings, name='list-all-bookings'),
+
+    path('reviews/create/', views.create_review, name='create-review'),
+    path('teachers/<int:teacher_id>/reviews/', views.get_teacher_reviews, name='teacher-reviews'),
+    path('teachers/<int:teacher_id>/reviews/delete/', views.delete_review, name='delete-review'),
 ]

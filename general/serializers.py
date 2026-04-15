@@ -28,6 +28,7 @@ class GeneralCategoryListSerializer(serializers.ModelSerializer):
             'is_active',
             'total_questions',
             'skills_count',
+            'is_favorite',
         ]
 
     def get_total_questions(self, obj):
@@ -35,6 +36,14 @@ class GeneralCategoryListSerializer(serializers.ModelSerializer):
 
     def get_skills_count(self, obj):
         return obj.skills.filter().count()
+    
+    def get_is_favorite(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return StudentFavoriteCategory.objects.filter(
+            student=request.user, category=obj
+        ).exists()
 
 
 class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
@@ -267,3 +276,18 @@ class SpeakingVideoGeneralSerializer(serializers.Serializer):
     thumbnail = serializers.URLField(required=False, allow_null=True)
     difficulty = serializers.CharField(required=False)
     questions = SpeakingQuestionGeneralSerializer(many=True)
+
+from .models import GeneralCategory, GeneralSkill, StudentGeneralProgress, StudentFavoriteCategory
+
+class StudentFavoriteCategorySerializer(serializers.ModelSerializer):
+    category = GeneralCategoryListSerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=GeneralCategory.objects.all(),
+        source='category',
+        write_only=True
+    )
+
+    class Meta:
+        model = StudentFavoriteCategory
+        fields = ['id', 'category', 'category_id', 'created_at']
+        read_only_fields = ['id', 'created_at']

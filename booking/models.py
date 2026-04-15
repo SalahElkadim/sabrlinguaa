@@ -1,6 +1,8 @@
 from django.db import models
 from cloudinary.models import CloudinaryField
 
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Avg
 
 class Teacher(models.Model):
     """
@@ -33,6 +35,51 @@ class Teacher(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.subject}"
+    @property
+    def average_rating(self):
+        result = self.reviews.aggregate(Avg('rating'))['rating__avg']
+        return round(result, 1) if result else None
+
+    @property
+    def reviews_count(self):
+        return self.reviews.count()
+
+class Review(models.Model):
+    """
+    نموذج تقييم المدرس
+    """
+    teacher = models.ForeignKey(
+        Teacher,
+        on_delete=models.CASCADE,
+        related_name='reviews',
+        verbose_name="المدرس"
+    )
+    student = models.ForeignKey(
+        'sabr_auth.User',
+        on_delete=models.CASCADE,
+        related_name='reviews',
+        verbose_name="الطالب"
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="التقييم"
+    )
+    comment = models.TextField(blank=True, null=True, verbose_name="تعليق")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "تقييم"
+        verbose_name_plural = "التقييمات"
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['teacher', 'student'],
+                name='unique_review_per_student'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.student} → {self.teacher.name}: {self.rating}⭐"
 
 
 class Booking(models.Model):
@@ -63,3 +110,4 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.teacher.name} - {self.requested_datetime}"
+    

@@ -87,7 +87,8 @@ def list_categories(request):
     GET /api/general/categories/
     """
     categories = GeneralCategory.objects.filter().order_by('order')
-    serializer = GeneralCategoryListSerializer(categories, many=True)
+    serializer = GeneralCategoryListSerializer(
+    categories, many=True, context={'request': request})
     return Response({
         'total_categories': categories.count(),
         'categories': serializer.data
@@ -1624,3 +1625,86 @@ def delete_writing_question(request, question_id):
     question = get_object_or_404(WritingQuestion, id=question_id, usage_type='GENERAL')
     question.delete()
     return Response({'message': 'تم حذف السؤال بنجاح'}, status=status.HTTP_200_OK)
+
+from .models import (
+    GeneralCategory, GeneralSkill,
+    StudentGeneralProgress, StudentGeneralQuestionAttempt,
+    StudentFavoriteCategory,
+)
+from .serializers import (
+    GeneralCategoryListSerializer,
+    GeneralCategoryDetailSerializer,
+    GeneralSkillListSerializer,
+    GeneralSkillDetailSerializer,
+    StudentGeneralProgressSerializer,
+    StudentFavoriteCategorySerializer,
+)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_favorite_category(request, category_id):
+    """
+    POST /api/general/categories/{category_id}/favorite/
+    لو مش في المفضلة → يضيفها
+    لو موجودة → يشيلها (toggle)
+    """
+    category = get_object_or_404(GeneralCategory, id=category_id)
+    student = request.user
+
+    favorite, created = StudentFavoriteCategory.objects.get_or_create(
+        student=student,
+        category=category
+    )
+
+    if not created:
+        favorite.delete()
+        return Response({
+            'message': 'تم إزالة الكاتيجوري من المفضلة',
+            'is_favorite': False,
+            'category_id': category_id,
+        }, status=status.HTTP_200_OK)
+
+    return Response({
+        'message': 'تم إضافة الكاتيجوري إلى المفضلة',
+        'is_favorite': True,
+        'category_id': category_id,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_favorite_categories(request):
+    """
+    GET /api/general/my-favorites/
+    عرض كل المفضلة للطالب الحالي
+    """
+    favorites = StudentFavoriteCategory.objects.filter(
+        student=request.user
+    ).select_related('category').order_by('-created_at')
+
+    serializer = StudentFavoriteCategorySerializer(favorites, many=True)
+
+    return Response({
+        'total_favorites': favorites.count(),
+        'favorites': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_favorite_status(request, category_id):
+    """
+    GET /api/general/categories/{category_id}/favorite/status/
+    بيتحقق لو الكاتيجوري دي في مفضلة الطالب ولا لأ
+    """
+    category = get_object_or_404(GeneralCategory, id=category_id)
+    is_favorite = StudentFavoriteCategory.objects.filter(
+        student=request.user,
+        category=category
+    ).exists()
+
+    return Response({
+        'category_id': category_id,
+        'is_favorite': is_favorite,
+    }, status=status.HTTP_200_OK)

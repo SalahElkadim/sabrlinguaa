@@ -104,4 +104,8 @@ urlpatterns = [
     path('ai/generate-skill/', ai_views.generate_skill, name='generate-skill'),
     path('ai/jobs/', ai_views.list_generation_jobs, name='list-generation-jobs'),
     path('ai/jobs/<int:job_id>/status/', ai_views.generation_job_status, name='generation-job-status'),
+
+    path('categories/<int:category_id>/favorite/', views.toggle_favorite_category, name='toggle-favorite'),
+    path('categories/<int:category_id>/favorite/status/', views.check_favorite_status, name='favorite-status'),
+    path('my-favorites/', views.my_favorite_categories, name='my-favorites'),
 ]

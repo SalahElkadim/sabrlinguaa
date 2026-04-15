@@ -265,5 +265,30 @@ class StudentGeneralQuestionAttempt(TimeStampedModel):
         points_map = {1: 20, 2: 15, 3: 10}
         return points_map.get(self.attempts_count, 5)
     
+class StudentFavoriteCategory(TimeStampedModel):
+    """
+    المفضلة — الكاتيجوريز اللي اختارها الطالب
+    """
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='favorite_categories',
+        verbose_name="الطالب"
+    )
+    category = models.ForeignKey(
+        GeneralCategory,
+        on_delete=models.CASCADE,
+        related_name='favorited_by',
+        verbose_name="الكاتيجوري"
+    )
 
+    class Meta:
+        verbose_name = "Favorite Category"
+        verbose_name_plural = "Favorite Categories"
+        unique_together = ['student', 'category']  # مينفعش يضيفها أكتر من مرة
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.student.email} ♥ {self.category.name}"
+    
 from .ai_models import GeneralExtractedBook, GeneralExtractedMedia, GeneralAIGenerationJob
