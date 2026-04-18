@@ -16,6 +16,7 @@ User = get_user_model()
 class GeneralCategoryListSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
     skills_count = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
 
     class Meta:
         model = GeneralCategory
@@ -38,6 +39,7 @@ class GeneralCategoryListSerializer(serializers.ModelSerializer):
         return obj.skills.filter().count()
     
     def get_is_favorite(self, obj):
+        from .models import StudentFavoriteCategory  # ← أو استورده فوق
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
