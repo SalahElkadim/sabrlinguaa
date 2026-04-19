@@ -65,6 +65,63 @@ class EspCategoryDetailSerializer(serializers.ModelSerializer):
         return EspSkillListSerializer(skills, many=True).data
 
 
+# serializers.py
+from cloudinary.uploader import upload as cloudinary_upload
+
+class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
+    total_questions = serializers.SerializerMethodField()
+    skills = serializers.SerializerMethodField()
+    icon = serializers.ImageField(write_only=True, required=False)
+    icon_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = EspCategory
+        fields = [
+            'id', 'name', 'description',
+            'icon',      # write only
+            'icon_url',  # read only
+            'order', 'is_active',
+            'total_questions', 'skills',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_icon_url(self, obj):
+        if not obj.icon:
+            return None
+        if hasattr(obj.icon, 'url'):
+            return obj.icon.url
+        return str(obj.icon)  # هيرجع الـ URL المحفوظ
+
+    def get_total_questions(self, obj):
+        return obj.get_total_questions_count()
+
+    def get_skills(self, obj):
+        skills = obj.skills.filter().order_by('order')
+        return EspSkillListSerializer(skills, many=True).data
+
+    def _upload_icon(self, icon_file):
+        result = cloudinary_upload(
+            icon_file,
+            folder='esp/category_icons'
+        )
+        return result['secure_url']
+
+    def create(self, validated_data):
+        icon_file = validated_data.pop('icon', None)
+        instance = super().create(validated_data)
+        if icon_file:
+            instance.icon = self._upload_icon(icon_file)
+            instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        icon_file = validated_data.pop('icon', None)
+        instance = super().update(instance, validated_data)
+        if icon_file:
+            instance.icon = self._upload_icon(icon_file)
+            instance.save()
+        return instance
 # ============================================
 # Skill Serializers
 # ============================================
