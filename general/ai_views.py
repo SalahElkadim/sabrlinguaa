@@ -366,7 +366,6 @@ def generation_job_status(request, job_id):
 
     return Response(response_data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_generation_jobs(request):
@@ -375,12 +374,26 @@ def list_generation_jobs(request):
     فلترة اختيارية بالكاتيجوري: ?category_id=3
     """
     from .ai_models import GeneralAIGenerationJob
+    from sabr_questions.models import ListeningAudio, SpeakingVideo
 
     qs = GeneralAIGenerationJob.objects.select_related('category', 'skill').order_by('-created_at')
 
     category_id = request.query_params.get('category_id')
     if category_id:
         qs = qs.filter(category_id=category_id)
+
+    def get_media_ids(j):
+        if j.skill_type == 'LISTENING' and j.skill:
+            audio = ListeningAudio.objects.filter(
+                general_skill=j.skill, usage_type='GENERAL'
+            ).first()
+            return {'audio_id': audio.id if audio else None, 'video_id': None}
+        elif j.skill_type == 'SPEAKING' and j.skill:
+            video = SpeakingVideo.objects.filter(
+                general_skill=j.skill, usage_type='GENERAL'
+            ).first()
+            return {'audio_id': None, 'video_id': video.id if video else None}
+        return {'audio_id': None, 'video_id': None}
 
     return Response({
         'jobs': [
@@ -394,7 +407,9 @@ def list_generation_jobs(request):
                 'skill_id': j.skill.id if j.skill else None,
                 'total_questions_requested': j.total_questions_requested,
                 'questions_created': j.questions_created,
+                'error_message': j.error_message,
                 'created_at': j.created_at,
+                **get_media_ids(j),
             }
             for j in qs[:50]
         ]
