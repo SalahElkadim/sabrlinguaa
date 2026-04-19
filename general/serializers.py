@@ -48,25 +48,29 @@ class GeneralCategoryListSerializer(serializers.ModelSerializer):
         ).exists()
 
 
+# serializers.py
+from cloudinary.uploader import upload as cloudinary_upload
+
 class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
-    total_questions = serializers.SerializerMethodField()
-    skills = serializers.SerializerMethodField()
+    icon = serializers.ImageField(write_only=True, required=False)
+    icon_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = GeneralCategory
         fields = [
-            'id',
-            'name',
-            'description',
-            'icon',
-            'order',
-            'is_active',
-            'total_questions',
-            'skills',
-            'created_at',
-            'updated_at',
+            'id', 'name', 'description',
+            'icon',      # write only
+            'icon_url',  # read only
+            'order', 'is_active',
+            'total_questions', 'skills',
+            'created_at', 'updated_at',
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+    def get_icon_url(self, obj):
+        if obj.icon:
+            return obj.icon.url
+        return None
 
     def get_total_questions(self, obj):
         return obj.get_total_questions_count()
@@ -75,7 +79,28 @@ class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
         skills = obj.skills.filter().order_by('order')
         return GeneralSkillListSerializer(skills, many=True).data
 
+    def _upload_icon(self, icon_file):
+        result = cloudinary_upload(
+            icon_file,
+            folder='general/category_icons'
+        )
+        return result['public_id']
 
+    def create(self, validated_data):
+        icon_file = validated_data.pop('icon', None)
+        instance = super().create(validated_data)
+        if icon_file:
+            instance.icon = self._upload_icon(icon_file)
+            instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        icon_file = validated_data.pop('icon', None)
+        instance = super().update(instance, validated_data)
+        if icon_file:
+            instance.icon = self._upload_icon(icon_file)
+            instance.save()
+        return instance
 # ============================================
 # Skill Serializers
 # ============================================
