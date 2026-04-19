@@ -70,9 +70,11 @@ class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
     def get_icon_url(self, obj):
-        if obj.icon:
+        if not obj.icon:
+            return None
+        if hasattr(obj.icon, 'url'):
             return obj.icon.url
-        return None
+        return str(obj.icon)  # هيرجع الـ URL المحفوظ
 
     def get_total_questions(self, obj):
         return obj.get_total_questions_count()
@@ -86,7 +88,7 @@ class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
             icon_file,
             folder='general/category_icons'
         )
-        return result['public_id']
+        return result['secure_url']
 
     def create(self, validated_data):
         icon_file = validated_data.pop('icon', None)
