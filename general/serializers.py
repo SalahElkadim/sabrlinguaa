@@ -52,6 +52,8 @@ class GeneralCategoryListSerializer(serializers.ModelSerializer):
 from cloudinary.uploader import upload as cloudinary_upload
 
 class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
+    total_questions = serializers.SerializerMethodField()
+    skills = serializers.SerializerMethodField()
     icon = serializers.ImageField(write_only=True, required=False)
     icon_url = serializers.SerializerMethodField(read_only=True)
 
