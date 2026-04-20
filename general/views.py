@@ -515,12 +515,6 @@ def create_listening_audio(request):
         logger.error(f"Error creating general listening audio: {str(e)}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_listening_audio(request):
-    print("DATA:", request.data)
-    print("FILES:", request.FILES)
-    print("Content-Type:", request.content_type)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
