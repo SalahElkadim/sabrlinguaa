@@ -404,12 +404,12 @@ def create_listening_audio(request):
     import cloudinary.uploader
 
     data = request.data
+
     required_fields = ['title', 'ielts_skill']
     for field in required_fields:
         if field not in data:
             return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # لازم يكون في audio_file سواء file أو URL
     if 'audio_file' not in request.FILES and 'audio_file' not in data:
         return Response({'audio_file': 'audio_file مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -421,27 +421,32 @@ def create_listening_audio(request):
         audio_file_value = None
 
         if 'audio_file' in request.FILES:
-            # رفع ملف حقيقي
             file = request.FILES['audio_file']
             upload_result = cloudinary.uploader.upload(
                 file,
-                resource_type='video',
+                resource_type='video',  # الصوت بيتعامل معاه كـ video في cloudinary
                 folder='ielts/listening',
             )
             audio_file_value = upload_result['public_id']
         else:
-            # URL مباشر (لو بتبعت string)
             audio_file_value = data.get('audio_file')
+
+        # ← هنا المشكلة: is_active بييجي string من FormData
+        is_active_raw = data.get('is_active', True)
+        if isinstance(is_active_raw, str):
+            is_active = is_active_raw.lower() not in ('false', '0', 'no')
+        else:
+            is_active = bool(is_active_raw)
 
         audio = ListeningAudio.objects.create(
             title=data.get('title'),
             audio_file=audio_file_value,
             transcript=data.get('transcript', ''),
-            duration=int(data.get('duration', 0)),
+            duration=int(data.get('duration', 0) or 0),
             usage_type='IELTS',
             ielts_skill=skill,
-            order=int(data.get('order', 0)),
-            is_active=data.get('is_active', True),
+            order=int(data.get('order', 0) or 0),
+            is_active=is_active,  # ← بعد التحويل
             difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
@@ -451,6 +456,7 @@ def create_listening_audio(request):
                 'id': audio.id,
                 'title': audio.title,
                 'audio_file': audio.audio_file.url if audio.audio_file else None,
+                'duration': audio.duration,
                 'created_at': audio.created_at,
             }
         }, status=status.HTTP_201_CREATED)
@@ -2024,16 +2030,18 @@ def set_child_skills(request, skill_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_speaking_video(request):
-    """
-    POST /api/ielts/speaking/videos/create/
-    """
     from sabr_questions.models import SpeakingVideo
+    import cloudinary.uploader
 
-    data = request.data.copy()
-    required_fields = ['title', 'video_file', 'ielts_skill']
+    data = request.data
+
+    required_fields = ['title', 'ielts_skill']
     for field in required_fields:
         if field not in data:
             return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if 'video_file' not in request.FILES and 'video_file' not in data:
+        return Response({'video_file': 'video_file مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         skill = get_object_or_404(IELTSSkill, id=data.get('ielts_skill'))
@@ -2043,15 +2051,45 @@ def create_speaking_video(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        video_file_value = None
+        thumbnail_value = None
+
+        if 'video_file' in request.FILES:
+            file = request.FILES['video_file']
+            upload_result = cloudinary.uploader.upload(
+                file,
+                resource_type='video',
+                folder='ielts/speaking',
+            )
+            video_file_value = upload_result['public_id']
+        else:
+            video_file_value = data.get('video_file')
+
+        if 'thumbnail' in request.FILES:
+            thumb = request.FILES['thumbnail']
+            thumb_result = cloudinary.uploader.upload(
+                thumb,
+                resource_type='image',
+                folder='ielts/speaking/thumbnails',
+            )
+            thumbnail_value = thumb_result['public_id']
+
+        is_active_raw = data.get('is_active', True)
+        if isinstance(is_active_raw, str):
+            is_active = is_active_raw.lower() not in ('false', '0', 'no')
+        else:
+            is_active = bool(is_active_raw)
+
         video = SpeakingVideo.objects.create(
             title=data.get('title'),
-            video_file=data.get('video_file'),
+            video_file=video_file_value,
+            thumbnail=thumbnail_value,
             description=data.get('description', ''),
-            duration=int(data.get('duration', 0)),
+            duration=int(data.get('duration', 0) or 0),
             usage_type='IELTS',
             ielts_skill=skill,
-            order=int(data.get('order', 0)),
-            is_active=data.get('is_active', True),
+            order=int(data.get('order', 0) or 0),
+            is_active=is_active,
             difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
@@ -2060,7 +2098,8 @@ def create_speaking_video(request):
             'video': {
                 'id': video.id,
                 'title': video.title,
-                'video_file': str(video.video_file) if video.video_file else None,
+                'video_file': video.video_file.url if video.video_file else None,
+                'thumbnail': video.thumbnail.url if video.thumbnail else None,
                 'description': video.description,
                 'duration': video.duration,
                 'created_at': video.created_at,
@@ -2070,7 +2109,6 @@ def create_speaking_video(request):
     except Exception as e:
         logger.error(f"Error creating IELTS speaking video: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
