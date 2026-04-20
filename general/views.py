@@ -469,6 +469,54 @@ def create_reading_question(request, passage_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_listening_audio(request):
+    """
+    POST /api/general/listening/audio/create/
+    """
+    print("DATA:", request.data)
+    print("FILES:", request.FILES)
+    print("Content-Type:", request.content_type)
+    from sabr_questions.models import ListeningAudio
+
+    data = request.data.copy()
+    required_fields = ['title', 'general_skill']
+# وبعدين check منفصل
+    if not request.FILES.get('audio_file'):
+        return Response({'audio_file': 'ملف صوتي مطلوب'}, status=400)
+
+    for field in required_fields:
+        if field not in data:
+            return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
+        if skill.skill_type != 'LISTENING':
+            return Response({'error': 'هذه المهارة ليست من نوع Listening'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        audio_file = request.FILES.get('audio_file')
+        audio = ListeningAudio.objects.create(
+            title=data.get('title'),
+            audio_file=audio_file,
+            transcript=data.get('transcript', ''),
+            duration=int(data.get('duration', 0)),
+            usage_type='GENERAL',
+            general_skill=skill,
+            order=int(data.get('order', 0)),
+            is_active=data.get('is_active', True),
+            difficulty=data.get('difficulty', 'MEDIUM'),
+        )
+
+        return Response({
+            'message': 'تم إنشاء التسجيل الصوتي بنجاح',
+            'audio': {'id': audio.id, 'title': audio.title, 'created_at': audio.created_at}
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        logger.error(f"Error creating general listening audio: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_listening_audio(request):
     print("DATA:", request.data)
     print("FILES:", request.FILES)
     print("Content-Type:", request.content_type)
