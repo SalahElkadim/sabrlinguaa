@@ -75,7 +75,13 @@ def _get_ordered_questions(queryset, order_type):
 
     return queryset.order_by('order', 'id')
 
+import cloudinary
 
+def _get_cloudinary_url(field_value, resource_type='video'):
+    if not field_value:
+        return None
+    public_id = str(field_value)
+    return cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type)[0]
 # ============================================
 # 1. CATEGORY CRUD
 # ============================================
@@ -841,7 +847,7 @@ def get_skill_questions(request, skill_id):
             questions_data.append({
                 'id': audio.id, 'type': 'LISTENING',
                 'title': audio.title,
-                'audio_file': str(audio.audio_file) if audio.audio_file else None,
+                'audio_file': _get_cloudinary_url(audio.audio_file, resource_type='video'),
                 'transcript': audio.transcript,
                 'duration': audio.duration,
                 'questions': audio_questions,
@@ -867,8 +873,8 @@ def get_skill_questions(request, skill_id):
             questions_data.append({
                 'id': video.id, 'type': 'SPEAKING',
                 'title': video.title,
-                'video_file': video.video_file.url if video.video_file else None,
-                'thumbnail': video.thumbnail.url if video.thumbnail else None,
+                'video_file': _get_cloudinary_url(video.video_file, resource_type='video'),
+                'thumbnail': _get_cloudinary_url(video.thumbnail, resource_type='image'),
                 'description': video.description,
                 'duration': video.duration,
                 'questions': video_questions,
