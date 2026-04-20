@@ -284,11 +284,16 @@ class ListeningQuestionEspSerializer(serializers.Serializer):
 class ListeningAudioEspSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField()
-    audio_file = serializers.URLField(required=False, allow_null=True)
+    audio_file = serializers.SerializerMethodField()  # ← غيّر ده
     transcript = serializers.CharField(required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
-    difficulty = serializers.CharField(required=False)
     questions = ListeningQuestionEspSerializer(many=True)
+    difficulty = serializers.CharField(required=False)
+
+    def get_audio_file(self, obj):  # ← أضف الميثود دي
+        if obj.audio_file:
+            return obj.audio_file.url  # بيرجع الـ Cloudinary URL الكامل
+        return None
 
 
 class WritingQuestionEspSerializer(serializers.Serializer):
@@ -320,9 +325,19 @@ class SpeakingQuestionEspSerializer(serializers.Serializer):
 class SpeakingVideoEspSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField()
-    video_file = serializers.URLField(required=False, allow_null=True)
+    video_file = serializers.SerializerMethodField()  # ← غيّر
     description = serializers.CharField(required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
-    thumbnail = serializers.URLField(required=False, allow_null=True)
-    difficulty = serializers.CharField(required=False)
+    thumbnail = serializers.SerializerMethodField()  # ← غيّر
     questions = SpeakingQuestionEspSerializer(many=True)
+    difficulty = serializers.CharField(required=False)
+
+    def get_video_file(self, obj):  # ← أضف
+        if obj.video_file:
+            return obj.video_file.url
+        return None
+
+    def get_thumbnail(self, obj):  # ← أضف
+        if obj.thumbnail:
+            return obj.thumbnail.url
+        return None
