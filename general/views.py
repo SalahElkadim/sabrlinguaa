@@ -475,7 +475,11 @@ def create_listening_audio(request):
     from sabr_questions.models import ListeningAudio
 
     data = request.data.copy()
-    required_fields = ['title', 'audio_file', 'general_skill']
+    required_fields = ['title', 'general_skill']
+# وبعدين check منفصل
+    if not request.FILES.get('audio_file'):
+        return Response({'audio_file': 'ملف صوتي مطلوب'}, status=400)
+
     for field in required_fields:
         if field not in data:
             return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
@@ -484,10 +488,11 @@ def create_listening_audio(request):
         skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
         if skill.skill_type != 'LISTENING':
             return Response({'error': 'هذه المهارة ليست من نوع Listening'}, status=status.HTTP_400_BAD_REQUEST)
-
+        
+        audio_file = request.FILES.get('audio_file')
         audio = ListeningAudio.objects.create(
             title=data.get('title'),
-            audio_file=data.get('audio_file'),
+            audio_file=audio_file,
             transcript=data.get('transcript', ''),
             duration=int(data.get('duration', 0)),
             usage_type='GENERAL',
@@ -1475,7 +1480,8 @@ def update_listening_audio(request, audio_id):
     data = request.data.copy()
     try:
         if 'title' in data: audio.title = data['title']
-        if 'audio_file' in data: audio.audio_file = data['audio_file']
+        audio_file = request.FILES.get('audio_file')
+        if audio_file: audio.audio_file = audio_file
         if 'transcript' in data: audio.transcript = data['transcript']
         if 'duration' in data: audio.duration = int(data['duration'])
         if 'is_active' in data: audio.is_active = data['is_active']
@@ -1539,7 +1545,8 @@ def update_speaking_video(request, video_id):
     data = request.data.copy()
     try:
         if 'title' in data: video.title = data['title']
-        if 'video_file' in data: video.video_file = data['video_file']
+        video_file = request.FILES.get('video_file')
+        if video_file: video.video_file = video_file
         if 'description' in data: video.description = data['description']
         if 'duration' in data: video.duration = int(data['duration'])
         if 'is_active' in data: video.is_active = data['is_active']
