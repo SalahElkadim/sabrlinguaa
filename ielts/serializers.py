@@ -26,8 +26,8 @@ class IELTSSkillListSerializer(serializers.ModelSerializer):
             'icon',
             'order',
             'total_questions',
-            'child_skills', 
-            'is_active', # ← جديد
+            'child_skills',  # ← جديد
+            'is_active',
             'question_order_type', 
         ]
 
@@ -201,7 +201,7 @@ class ListeningAudioIELTSSerializer(serializers.Serializer):
     def get_audio_file(self, obj):  # ← أضف الميثود دي
         if obj.audio_file:
             return obj.audio_file.url  # بيرجع الـ Cloudinary URL الكامل
-        return None 
+        return None
 
 
 # ============================================
