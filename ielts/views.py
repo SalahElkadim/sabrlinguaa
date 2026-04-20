@@ -449,7 +449,7 @@ def create_listening_audio(request):
             is_active=is_active,  # ← بعد التحويل
             difficulty=data.get('difficulty', 'MEDIUM'),
         )
-
+        audio.refresh_from_db()
         return Response({
             'message': 'تم إنشاء التسجيل الصوتي بنجاح',
             'audio': {
