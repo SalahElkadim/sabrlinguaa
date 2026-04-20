@@ -867,8 +867,8 @@ def get_skill_questions(request, skill_id):
             questions_data.append({
                 'id': video.id, 'type': 'SPEAKING',
                 'title': video.title,
-                'video_file': str(video.video_file) if video.video_file else None,
-                'thumbnail': str(video.thumbnail) if video.thumbnail else None,
+                'video_file': video.video_file.url if video.video_file else None,
+                'thumbnail': video.thumbnail.url if video.thumbnail else None,
                 'description': video.description,
                 'duration': video.duration,
                 'questions': video_questions,
