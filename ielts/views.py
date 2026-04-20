@@ -1365,7 +1365,7 @@ def update_listening_audio(request, audio_id):
             audio.audio_file = upload_result['public_id']
 
         audio.save()
-
+        audio.refresh_from_db()
         # رجّع الـ URL الكامل
         return Response({
             'message': 'تم تحديث التسجيل الصوتي بنجاح',
@@ -2198,6 +2198,7 @@ def update_speaking_video(request, video_id):
             video.difficulty = data['difficulty']
 
         video.save()
+        video.refresh_from_db() 
         return Response({
             'message': 'تم تحديث الفيديو بنجاح',
             'video': {'id': video.id, 'title': video.title}
