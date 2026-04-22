@@ -58,9 +58,9 @@ def verify_webhook_signature(payload: bytes, signature: str) -> bool:
     if not signature or not hasattr(settings, 'MOYASAR_WEBHOOK_SECRET'):
         return True
 
-    expected = hmac.new(
-        settings.MOYASAR_WEBHOOK_SECRET.encode(),
-        payload,
-        hashlib.sha256,
+    expected = hmac.HMAC(
+        key=settings.MOYASAR_WEBHOOK_SECRET.encode(),
+        msg=payload,
+        digestmod=hashlib.sha256,
     ).hexdigest()
     return hmac.compare_digest(expected, signature)

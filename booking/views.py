@@ -661,7 +661,7 @@ def subscription_payment_callback(request):
         return Response({'error': 'تعذر التحقق من الدفع'}, status=status.HTTP_502_BAD_GATEWAY)
 
     payment_status = payment_data.get('status')
-    metadata = payment_data.get('metadata', {})
+    metadata = payment_data.get('metadata') or {}
     program_id = metadata.get('program_id')
     student_id = metadata.get('student_id')
 
