@@ -101,6 +101,7 @@ def _send_subscription_emails(subscription):
             message=f"""
 اشتراك جديد في المنصة!
 
+
 الطالب: {student.full_name} ({student.email})
 البرنامج: {program.title}
 المدرس: {teacher.name}
