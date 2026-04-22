@@ -553,16 +553,31 @@ from .moyasar_service import create_payment, get_payment, verify_webhook_signatu
 @permission_classes([IsAuthenticated])
 def initiate_subscription_payment(request):
     """
-    الخطوة 1: إنشاء طلب الدفع وإرجاع payment_url للموبايل
+    إنشاء طلب الدفع باستخدام token من Moyasar.js
     POST /booking/subscriptions/pay/
 
-    Body: { "program_id": 1 }
+    Body:
+    {
+        "program_id": 1,
+        "token": "tok_xxxxxxxxxxxxxxxx"   ← الـ token من Moyasar.js في الـ Frontend
+    }
 
-    Response: { "payment_id": "pay_xxx", "payment_url": "https://...", "amount": 500.00 }
+    Response:
+    {
+        "payment_id": "pay_xxx",
+        "status": "initiated",
+        "transaction_url": "https://..."  ← لو محتاج 3DS redirect
+        "amount": 500.00
+    }
     """
     program_id = request.data.get('program_id')
+    token = request.data.get('token')
+
+    # Validation
     if not program_id:
         return Response({'error': 'program_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+    if not token:
+        return Response({'error': 'token مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
     program = get_object_or_404(Program, id=program_id, is_active=True)
 
@@ -579,10 +594,7 @@ def initiate_subscription_payment(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # تحويل السعر لهللة
     amount_halalas = int(program.price * 100)
-
-    # callback_url هي صفحة React
     callback_url = f"{settings.FRONTEND_URL}/payment/callback"
 
     try:
@@ -590,6 +602,7 @@ def initiate_subscription_payment(request):
             amount_halalas=amount_halalas,
             description=f"اشتراك في برنامج: {program.title}",
             callback_url=callback_url,
+            token=token,                          # ← بنبعت الـ token هنا
             metadata={
                 "program_id": str(program.id),
                 "student_id": str(request.user.id),
@@ -602,9 +615,24 @@ def initiate_subscription_payment(request):
             status=status.HTTP_502_BAD_GATEWAY
         )
 
+    payment_status_from_moyasar = payment_data.get('status')
+    moyasar_id = payment_data.get('id')
+    transaction_url = payment_data.get('source', {}).get('transaction_url')
+
+    # لو الدفع اتأكد على طول (paid) — بدون 3DS
+    if payment_status_from_moyasar == 'paid':
+        Subscription.objects.create(
+            student=request.user,
+            program=program,
+            payment_id=moyasar_id,
+            payment_status='paid',
+            amount=program.price,
+        )
+
     return Response({
-        'payment_id': payment_data['id'],
-        'payment_url': payment_data['source']['transaction_url'],
+        'payment_id': moyasar_id,
+        'status': payment_status_from_moyasar,
+        'transaction_url': transaction_url,   # ← الـ Frontend يعمل redirect لو موجود
         'amount': program.price,
     }, status=status.HTTP_200_OK)
 
