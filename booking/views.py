@@ -23,97 +23,197 @@ logger = logging.getLogger(__name__)
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
+def _get_student_email_html(student, program, teacher, subscription, schedules_text):
+    schedules_badges = "".join([
+        f'<span style="background:#dcfce7;color:#15803d;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;display:inline-block;margin:3px;">{s.get_day_of_week_display()} {s.time.strftime("%I:%M %p")}</span>'
+        for s in program.schedules.all()
+    ])
+    return f"""
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;direction:rtl;">
+  <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0e0e0;">
+    
+    <div style="background:#16a34a;padding:32px 28px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">🎓</div>
+      <h1 style="color:#fff;margin:0;font-size:22px;font-weight:700;">تم تأكيد اشتراكك بنجاح!</h1>
+      <p style="color:#bbf7d0;margin:8px 0 0;font-size:14px;">مرحباً بك في رحلتك التعليمية</p>
+    </div>
+
+    <div style="padding:28px;">
+      <p style="color:#374151;font-size:15px;margin:0 0 20px;">مرحباً <strong>{student.full_name}</strong>،</p>
+
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:20px;margin-bottom:20px;">
+        <div style="margin-bottom:14px;">
+          <span style="font-size:18px;">📚</span>
+          <span style="font-weight:700;color:#15803d;font-size:16px;margin-right:6px;">تفاصيل البرنامج</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:40%;">البرنامج</td><td style="color:#111827;font-size:14px;font-weight:600;">{program.title}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">المدرس</td><td style="color:#111827;font-size:14px;">{teacher.name}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">المدة</td><td style="color:#111827;font-size:14px;">{program.duration}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">النظام</td><td style="color:#111827;font-size:14px;">{program.get_recurrence_display()}</td></tr>
+        </table>
+        <div style="border-top:1px solid #bbf7d0;margin-top:12px;padding-top:12px;">
+          <p style="color:#6b7280;font-size:13px;margin:0 0 8px;">المواعيد</p>
+          {schedules_badges}
+        </div>
+      </div>
+
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:20px;margin-bottom:20px;">
+        <div style="margin-bottom:14px;">
+          <span style="font-size:18px;">💳</span>
+          <span style="font-weight:700;color:#374151;font-size:16px;margin-right:6px;">تفاصيل الدفع</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#6b7280;font-size:14px;">المبلغ المدفوع</span>
+          <span style="font-size:22px;font-weight:700;color:#16a34a;">{subscription.amount} ريال</span>
+        </div>
+        <div style="border-top:1px dashed #e5e7eb;margin-top:10px;padding-top:10px;">
+          <span style="color:#9ca3af;font-size:12px;">رقم العملية: {subscription.payment_id}</span>
+        </div>
+      </div>
+
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px;text-align:center;">
+        <p style="color:#92400e;font-size:14px;margin:0;">⏳ سيتم التواصل معك قريباً لتحديد تفاصيل البداية</p>
+      </div>
+    </div>
+
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px;text-align:center;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Sabrlinguaa · جميع الحقوق محفوظة</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def _get_teacher_email_html(teacher, student, program, schedules_badges):
+    return f"""
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;direction:rtl;">
+  <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0e0e0;">
+    <div style="background:#1d4ed8;padding:28px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">🎓</div>
+      <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">طالب جديد اشترك في برنامجك!</h1>
+    </div>
+    <div style="padding:28px;">
+      <p style="color:#374151;font-size:15px;margin:0 0 20px;">مرحباً <strong>{teacher.name}</strong>،</p>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:20px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:40%;">اسم الطالب</td><td style="color:#111827;font-size:14px;font-weight:600;">{student.full_name}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">البريد</td><td style="color:#1d4ed8;font-size:14px;">{student.email}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">البرنامج</td><td style="color:#111827;font-size:14px;">{program.title}</td></tr>
+        </table>
+        <div style="border-top:1px solid #bfdbfe;margin-top:12px;padding-top:12px;">
+          <p style="color:#6b7280;font-size:13px;margin:0 0 8px;">المواعيد</p>
+          {schedules_badges}
+        </div>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px;text-align:center;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Sabrlinguaa · جميع الحقوق محفوظة</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+
+def _get_company_email_html(student, program, teacher, subscription):
+    return f"""
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;direction:rtl;">
+  <div style="max-width:560px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0e0e0;">
+    <div style="background:#7c3aed;padding:28px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">💰</div>
+      <h1 style="color:#fff;margin:0;font-size:20px;font-weight:700;">اشتراك جديد في المنصة!</h1>
+    </div>
+    <div style="padding:28px;">
+      <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:20px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:40%;">الطالب</td><td style="color:#111827;font-size:14px;font-weight:600;">{student.full_name}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">البريد</td><td style="color:#111827;font-size:14px;">{student.email}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">البرنامج</td><td style="color:#111827;font-size:14px;">{program.title}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">المدرس</td><td style="color:#111827;font-size:14px;">{teacher.name}</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">المبلغ</td><td style="color:#16a34a;font-size:18px;font-weight:700;">{subscription.amount} ريال</td></tr>
+          <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">payment_id</td><td style="color:#6b7280;font-size:12px;font-family:monospace;">{subscription.payment_id}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px;text-align:center;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">Sabrlinguaa Dashboard</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
 
 def _send_subscription_emails(subscription):
-    """
-    helper function لإرسال الـ 3 إيميلات بعد الاشتراك
-    """
     program = subscription.program
     teacher = program.teacher
     student = subscription.student
 
-    schedules_text = "\n".join([
-        f"  - {s.get_day_of_week_display()} الساعة {s.time.strftime('%I:%M %p')}"
+    schedules_badges = "".join([
+        f'<span style="background:#dcfce7;color:#15803d;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;display:inline-block;margin:3px;">{s.get_day_of_week_display()} {s.time.strftime("%I:%M %p")}</span>'
         for s in program.schedules.all()
     ])
 
     # إيميل الطالب
     try:
-        send_mail(
+        from django.core.mail import EmailMultiAlternatives
+        msg = EmailMultiAlternatives(
             subject=f"✅ تم تأكيد اشتراكك في برنامج {program.title}",
-            message=f"""
-مرحباً {student.full_name}،
-
-تم تأكيد اشتراكك بنجاح!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📚 تفاصيل البرنامج:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-البرنامج: {program.title}
-المدرس: {teacher.name}
-المدة: {program.duration}
-النظام: {program.get_recurrence_display()}
-المواعيد:
-{schedules_text}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-💳 تفاصيل الدفع:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-المبلغ: {subscription.amount} جنيه
-رقم العملية: {subscription.payment_id}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-سيتم التواصل معك قريباً لتحديد تفاصيل البداية.
-            """,
+            body=f"تم تأكيد اشتراكك في برنامج {program.title}",  # plain text fallback
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[student.email],
-            fail_silently=True,
+            to=[student.email],
         )
+        msg.attach_alternative(
+            _get_student_email_html(student, program, teacher, subscription, schedules_badges),
+            "text/html"
+        )
+        msg.send(fail_silently=True)
     except Exception as e:
         logger.error(f"Student subscription email failed: {e}")
 
     # إيميل المدرس
     try:
-        send_mail(
+        msg = EmailMultiAlternatives(
             subject=f"🎓 طالب جديد اشترك في برنامج {program.title}",
-            message=f"""
-مرحباً {teacher.name}،
-
-طالب جديد اشترك في برنامجك!
-
-الاسم: {student.full_name}
-البريد: {student.email}
-البرنامج: {program.title}
-المواعيد:
-{schedules_text}
-            """,
+            body=f"طالب جديد: {student.full_name} اشترك في {program.title}",
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[teacher.email],
-            fail_silently=True,
+            to=[teacher.email],
         )
+        msg.attach_alternative(
+            _get_teacher_email_html(teacher, student, program, schedules_badges),
+            "text/html"
+        )
+        msg.send(fail_silently=True)
     except Exception as e:
         logger.error(f"Teacher subscription email failed: {e}")
 
-    # إيميل التطبيق
+    # إيميل الشركة
     try:
-        send_mail(
+        msg = EmailMultiAlternatives(
             subject=f"💰 اشتراك جديد - {program.title}",
-            message=f"""
-اشتراك جديد في المنصة!
-
-
-الطالب: {student.full_name} ({student.email})
-البرنامج: {program.title}
-المدرس: {teacher.name}
-المبلغ: {subscription.amount} جنيه
-payment_id: {subscription.payment_id}
-            """,
+            body=f"اشتراك جديد: {student.full_name} - {program.title} - {subscription.amount} ريال",
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[settings.COMPANY_EMAIL],
-            fail_silently=True,
+            to=[settings.COMPANY_EMAIL],
         )
+        msg.attach_alternative(
+            _get_company_email_html(student, program, teacher, subscription),
+            "text/html"
+        )
+        msg.send(fail_silently=True)
     except Exception as e:
         logger.error(f"Company subscription email failed: {e}")
+
 # ============================================
 # 1. TEACHER CRUD (Admin)
 # ============================================
