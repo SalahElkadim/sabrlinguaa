@@ -637,7 +637,6 @@ def initiate_subscription_payment(request):
         'amount': program.price,
     }, status=status.HTTP_200_OK)
 
-
 @csrf_exempt
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
@@ -663,11 +662,10 @@ def subscription_payment_callback(request):
     payment_status = payment_data.get('status')
     metadata = payment_data.get('metadata') or {}
 
-    # ✅ خد من metadata لو موجود، لو لأ خد من request.data
     program_id = metadata.get('program_id') or request.data.get('program_id')
     student_id = metadata.get('student_id')
 
-    logger.info(f"Callback - payment_id: {payment_id}, status: {payment_status}, program_id: {program_id}, student_id: {student_id}")
+    logger.info(f"Callback - payment_id: {payment_id}, status: {payment_status}, program_id: {program_id}")
 
     if not program_id:
         return Response({'error': 'program_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
@@ -685,20 +683,13 @@ def subscription_payment_callback(request):
     from django.contrib.auth import get_user_model
     User = get_user_model()
 
-    # ✅ جيب الـ student من metadata أو من الـ Moyasar payment مباشرةً
+    # جيب الـ student
     if student_id:
         student = get_object_or_404(User, id=student_id)
+    elif request.user.is_authenticated:
+        student = request.user
     else:
-        # fallback: دور على الـ subscription الـ pending بنفس الـ program
-        pending = Subscription.objects.filter(
-            program=program,
-            payment_status='pending'
-        ).order_by('-id').first()
-        
-        if not pending:
-            return Response({'error': 'تعذر تحديد الطالب'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        student = pending.student
+        return Response({'error': 'تعذر تحديد الطالب'}, status=status.HTTP_400_BAD_REQUEST)
 
     amount = payment_data.get('amount', 0) / 100
 
