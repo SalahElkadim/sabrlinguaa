@@ -7,19 +7,112 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
-from .models import Teacher, Booking
+from .models import Teacher
 from .serializers import (
     TeacherListSerializer,
     TeacherDetailSerializer,
     TeacherCreateUpdateSerializer,
-    BookingCreateSerializer,
-    BookingDetailSerializer,
+  
 )
 
 import logging
 logger = logging.getLogger(__name__)
 
 
+
+# ============================================
+# HELPER FUNCTIONS
+# ============================================
+
+def _send_subscription_emails(subscription):
+    """
+    helper function لإرسال الـ 3 إيميلات بعد الاشتراك
+    """
+    program = subscription.program
+    teacher = program.teacher
+    student = subscription.student
+
+    schedules_text = "\n".join([
+        f"  - {s.get_day_of_week_display()} الساعة {s.time.strftime('%I:%M %p')}"
+        for s in program.schedules.all()
+    ])
+
+    # إيميل الطالب
+    try:
+        send_mail(
+            subject=f"✅ تم تأكيد اشتراكك في برنامج {program.title}",
+            message=f"""
+مرحباً {student.full_name}،
+
+تم تأكيد اشتراكك بنجاح!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 تفاصيل البرنامج:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+البرنامج: {program.title}
+المدرس: {teacher.name}
+المدة: {program.duration}
+النظام: {program.get_recurrence_display()}
+المواعيد:
+{schedules_text}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💳 تفاصيل الدفع:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+المبلغ: {subscription.amount} جنيه
+رقم العملية: {subscription.payment_id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+سيتم التواصل معك قريباً لتحديد تفاصيل البداية.
+            """,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[student.email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        logger.error(f"Student subscription email failed: {e}")
+
+    # إيميل المدرس
+    try:
+        send_mail(
+            subject=f"🎓 طالب جديد اشترك في برنامج {program.title}",
+            message=f"""
+مرحباً {teacher.name}،
+
+طالب جديد اشترك في برنامجك!
+
+الاسم: {student.full_name}
+البريد: {student.email}
+البرنامج: {program.title}
+المواعيد:
+{schedules_text}
+            """,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[teacher.email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        logger.error(f"Teacher subscription email failed: {e}")
+
+    # إيميل التطبيق
+    try:
+        send_mail(
+            subject=f"💰 اشتراك جديد - {program.title}",
+            message=f"""
+اشتراك جديد في المنصة!
+
+الطالب: {student.full_name} ({student.email})
+البرنامج: {program.title}
+المدرس: {teacher.name}
+المبلغ: {subscription.amount} جنيه
+payment_id: {subscription.payment_id}
+            """,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.COMPANY_EMAIL],
+            fail_silently=True,
+        )
+    except Exception as e:
+        logger.error(f"Company subscription email failed: {e}")
 # ============================================
 # 1. TEACHER CRUD (Admin)
 # ============================================
@@ -135,187 +228,8 @@ def delete_teacher(request, teacher_id):
     }, status=status.HTTP_200_OK)
 
 
-# ============================================
-# 2. BOOKING
-# ============================================
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_booking(request):
-    """
-    إنشاء حجز جديد مع إرسال إيميل للشركة
-
-    POST /booking/create/
-
-    Body:
-    {
-        "teacher": 1,
-        "phone_number": "01012345678",
-        "requested_datetime": "2025-06-15T14:00:00",
-        "notes": "أريد التركيز على المحادثة"
-    }
-    """
-    serializer = BookingCreateSerializer(data=request.data)
-
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        booking = serializer.save(student=request.user)
-
-        # ============================================
-        # إرسال إيميل للشركة
-        # ============================================
-        try:
-            teacher = booking.teacher
-            student = request.user
-
-            subject = f"🎓 حجز حصة جديد - {student.full_name}"
-
-            message = f"""
-تفاصيل الحجز الجديد:
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 بيانات الطالب:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-الاسم: {student.full_name}
-البريد الإلكتروني: {student.email}
-رقم التليفون: {booking.phone_number}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-👨‍🏫 بيانات المدرس:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-الاسم: {teacher.name}
-المادة: {teacher.subject}
-تكلفة الحصة: {teacher.session_price} جنيه
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-📅 تفاصيل الحجز:
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-التاريخ والوقت المطلوب: {booking.requested_datetime.strftime('%Y-%m-%d %H:%M')}
-ملاحظات الطالب: {booking.notes or 'لا يوجد'}
-تاريخ إنشاء الحجز: {booking.created_at.strftime('%Y-%m-%d %H:%M')}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-يرجى التواصل مع الطالب على الواتساب: {booking.phone_number}
-            """
-
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.COMPANY_EMAIL],
-                fail_silently=False,
-            )
-
-        except Exception as email_error:
-            logger.error(f"Failed to send booking notification email: {str(email_error)}")
-            # مش هنرجع error للطالب لو الإيميل فشل - الحجز اتسجل بنجاح
-
-        return Response({
-            'message': 'تم إرسال طلب الحجز بنجاح، سيتم التواصل معك قريباً',
-            'booking': BookingDetailSerializer(booking).data
-        }, status=status.HTTP_201_CREATED)
-
-    except Exception as e:
-        logger.error(f"Error creating booking: {str(e)}")
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def my_bookings(request):
-    """
-    عرض حجوزات الطالب الحالي
-
-    GET /booking/my-bookings/
-    """
-    bookings = Booking.objects.filter(
-        student=request.user
-    ).select_related('teacher').order_by('-created_at')
-
-    serializer = BookingDetailSerializer(bookings, many=True)
-
-    return Response({
-        'total_bookings': bookings.count(),
-        'bookings': serializer.data
-    }, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def get_booking(request, booking_id):
-    """
-    عرض تفاصيل حجز معين
-
-    GET /booking/{booking_id}/
-    """
-    booking = get_object_or_404(
-        Booking,
-        id=booking_id,
-        student=request.user
-    )
-    serializer = BookingDetailSerializer(booking)
-
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def cancel_booking(request, booking_id):
-    """
-    إلغاء حجز
-
-    DELETE /booking/{booking_id}/cancel/
-    """
-    booking = get_object_or_404(
-        Booking,
-        id=booking_id,
-        student=request.user
-    )
-
-    booking.delete()
-
-    return Response({
-        'message': 'تم إلغاء الحجز بنجاح'
-    }, status=status.HTTP_200_OK)
-
-
-# ============================================
-# 3. ADMIN - عرض جميع الحجوزات
-# ============================================
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_all_bookings(request):
-    """
-    عرض جميع الحجوزات (للأدمن)
-
-    GET /booking/all/
-
-    Query Parameters:
-    - teacher_id: filter by teacher
-    """
-    teacher_id = request.query_params.get('teacher_id', None)
-
-    bookings = Booking.objects.select_related(
-        'student', 'teacher'
-    ).order_by('-created_at')
-
-    if teacher_id:
-        bookings = bookings.filter(teacher_id=teacher_id)
-
-    serializer = BookingDetailSerializer(bookings, many=True)
-
-    return Response({
-        'total_bookings': bookings.count(),
-        'bookings': serializer.data
-    }, status=status.HTTP_200_OK)
-
-from .models import Teacher, Booking, Review
+from .models import Teacher, Review
 from .serializers import ReviewSerializer, ReviewCreateSerializer
 
 @api_view(['POST'])
@@ -370,3 +284,384 @@ def delete_review(request, teacher_id):
     )
     review.delete()
     return Response({'message': 'تم حذف التقييم بنجاح'})
+
+import hmac
+import hashlib
+from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from .models import Program, ProgramSchedule, Subscription, CustomProgram
+from .serializers import (
+    ProgramListSerializer, ProgramCreateUpdateSerializer,
+    SubscriptionSerializer, SubscriptionCreateSerializer,
+    CustomProgramCreateSerializer, CustomProgramDetailSerializer,
+)
+from .moyasar_service import get_payment, verify_webhook_signature
+
+
+# ============================================
+# PROGRAM VIEWS
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_programs(request):
+    """
+    عرض جميع البرامج النشطة
+    GET /booking/programs/
+    
+    Query Parameters:
+    - teacher_id: filter by teacher
+    """
+    teacher_id = request.query_params.get('teacher_id')
+    programs = Program.objects.filter(is_active=True).select_related('teacher').prefetch_related('schedules')
+
+    if teacher_id:
+        programs = programs.filter(teacher_id=teacher_id)
+
+    serializer = ProgramListSerializer(programs, many=True)
+    return Response({
+        'total_programs': programs.count(),
+        'programs': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_program(request, program_id):
+    """
+    عرض تفاصيل برنامج معين
+    GET /booking/programs/{program_id}/
+    """
+    program = get_object_or_404(Program, id=program_id)
+    serializer = ProgramListSerializer(program)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_program(request):
+    """
+    إنشاء برنامج تعليمي جديد (للأدمن)
+    POST /booking/programs/create/
+
+    Body:
+    {
+        "teacher": 1,
+        "title": "برنامج تأسيس الإنجليزي",
+        "description": "برنامج شامل...",
+        "recurrence": "weekly",
+        "duration": "3 أشهر",
+        "price": 500.00,
+        "is_active": true,
+        "schedules": [
+            {"day_of_week": 5, "time": "08:00:00"},
+            {"day_of_week": 6, "time": "16:00:00"},
+            {"day_of_week": 3, "time": "15:00:00"}
+        ]
+    }
+    """
+    serializer = ProgramCreateUpdateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    program = serializer.save()
+    return Response({
+        'message': 'تم إنشاء البرنامج بنجاح',
+        'program': ProgramListSerializer(program).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_program(request, program_id):
+    """
+    تعديل برنامج تعليمي (للأدمن)
+    PUT/PATCH /booking/programs/{program_id}/update/
+    """
+    program = get_object_or_404(Program, id=program_id)
+    partial = request.method == 'PATCH'
+    serializer = ProgramCreateUpdateSerializer(program, data=request.data, partial=partial)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    program = serializer.save()
+    return Response({
+        'message': 'تم تحديث البرنامج بنجاح',
+        'program': ProgramListSerializer(program).data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_program(request, program_id):
+    """
+    حذف برنامج تعليمي (للأدمن)
+    DELETE /booking/programs/{program_id}/delete/
+    """
+    program = get_object_or_404(Program, id=program_id)
+    title = program.title
+    program.delete()
+    return Response({
+        'message': 'تم حذف البرنامج بنجاح',
+        'program_id': program_id,
+        'title': title
+    }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# SUBSCRIPTION VIEWS
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_subscriptions(request):
+    """
+    عرض اشتراكات الطالب الحالي
+    GET /booking/subscriptions/my/
+    """
+    subscriptions = Subscription.objects.filter(
+        student=request.user,
+        payment_status='paid'
+    ).select_related('program__teacher').prefetch_related('program__schedules')
+
+    serializer = SubscriptionSerializer(subscriptions, many=True)
+    return Response({
+        'total_subscriptions': subscriptions.count(),
+        'subscriptions': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# WEBHOOK - Moyasar
+# ============================================
+
+@csrf_exempt
+@api_view(['POST'])
+def moyasar_webhook(request):
+    """
+    Webhook من Moyasar لتحديث حالة الدفع تلقائياً
+    POST /booking/webhooks/moyasar/
+
+    ⚠️ مش محتاج IsAuthenticated لأن Moyasar هو اللي بيبعت
+    """
+    # التحقق من الـ signature
+    signature = request.headers.get('X-Moyasar-Signature', '')
+    if not verify_webhook_signature(request.body, signature):
+        logger.warning("Moyasar webhook: invalid signature")
+        return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
+
+    event = request.data
+    event_type = event.get('type')
+    payment = event.get('data', {})
+    payment_id = payment.get('id')
+    payment_status = payment.get('status')
+
+    logger.info(f"Moyasar webhook received: type={event_type}, payment_id={payment_id}, status={payment_status}")
+
+    if event_type == 'payment_paid':
+        Subscription.objects.filter(payment_id=payment_id).update(payment_status='paid')
+
+    elif event_type == 'payment_failed':
+        Subscription.objects.filter(payment_id=payment_id).update(payment_status='failed')
+
+    return Response({'message': 'ok'}, status=status.HTTP_200_OK)
+
+
+# ============================================
+# CUSTOM PROGRAM VIEWS
+# ============================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_custom_program(request):
+    """
+    إرسال طلب تخصيص برنامج
+    POST /booking/custom-programs/create/
+
+    Body:
+    {
+        "teacher": 1,
+        "whatsapp_number": "01012345678",
+        "recurrence": "weekly",
+        "duration": "شهرين",
+        "curriculum": "أريد التركيز على المحادثة والنطق",
+        "schedules": [
+            {"day_of_week": 5, "time": "09:00:00"},
+            {"day_of_week": 1, "time": "17:00:00"}
+        ]
+    }
+    """
+    serializer = CustomProgramCreateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    custom_program = serializer.save(student=request.user)
+
+    # إيميل للدعم
+    try:
+        student = request.user
+        teacher = custom_program.teacher
+        schedules_text = "\n".join([
+            f"  - {s.get_day_of_week_display()} الساعة {s.time.strftime('%I:%M %p')}"
+            for s in custom_program.schedules.all()
+        ])
+
+        send_mail(
+            subject=f"📋 طلب تخصيص برنامج جديد - {student.full_name}",
+            message=f"""
+طلب تخصيص برنامج جديد!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 بيانات الطالب:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+الاسم: {student.full_name}
+البريد: {student.email}
+واتساب: {custom_program.whatsapp_number}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+👨‍🏫 المدرس المطلوب:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+{teacher.name} - {teacher.subject}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 تفاصيل البرنامج المطلوب:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+المنهج: {custom_program.curriculum}
+المدة: {custom_program.duration}
+النظام: {custom_program.get_recurrence_display()}
+المواعيد المفضلة:
+{schedules_text}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+            """,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.COMPANY_EMAIL],
+            fail_silently=True,
+        )
+    except Exception as e:
+        logger.error(f"Custom program support email failed: {e}")
+
+    return Response({
+        'message': 'تم إرسال طلب التخصيص بنجاح، سنقوم بالتواصل معك في أقرب وقت'
+    }, status=status.HTTP_201_CREATED)
+
+
+from .moyasar_service import create_payment, get_payment, verify_webhook_signature
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def initiate_subscription_payment(request):
+    """
+    الخطوة 1: إنشاء طلب الدفع وإرجاع payment_url للموبايل
+    POST /booking/subscriptions/pay/
+
+    Body: { "program_id": 1 }
+
+    Response: { "payment_id": "pay_xxx", "payment_url": "https://...", "amount": 500.00 }
+    """
+    program_id = request.data.get('program_id')
+    if not program_id:
+        return Response({'error': 'program_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    program = get_object_or_404(Program, id=program_id, is_active=True)
+
+    # التحقق إن الطالب مش مشترك أصلاً
+    already_subscribed = Subscription.objects.filter(
+        student=request.user,
+        program=program,
+        payment_status='paid'
+    ).exists()
+
+    if already_subscribed:
+        return Response(
+            {'error': 'أنت مشترك بالفعل في هذا البرنامج'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # تحويل السعر لهللة
+    amount_halalas = int(program.price * 100)
+
+    # callback_url هي صفحة React
+    callback_url = f"{settings.FRONTEND_URL}/payment/callback"
+
+    try:
+        payment_data = create_payment(
+            amount_halalas=amount_halalas,
+            description=f"اشتراك في برنامج: {program.title}",
+            callback_url=callback_url,
+            metadata={
+                "program_id": str(program.id),
+                "student_id": str(request.user.id),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Moyasar create payment failed: {e}")
+        return Response(
+            {'error': 'تعذر إنشاء طلب الدفع، حاول مرة أخرى'},
+            status=status.HTTP_502_BAD_GATEWAY
+        )
+
+    return Response({
+        'payment_id': payment_data['id'],
+        'payment_url': payment_data['source']['transaction_url'],
+        'amount': program.price,
+    }, status=status.HTTP_200_OK)
+
+@csrf_exempt
+@api_view(['GET', 'POST'])
+def subscription_payment_callback(request):
+    """
+    بيتكلمه React بعد ما Moyasar يعمل redirect
+    POST /booking/subscriptions/callback/
+    Body: { "id": "pay_xxxxxxxx" }
+    """
+    payment_id = request.data.get('id') or request.query_params.get('id')
+
+    if not payment_id:
+        return Response({'error': 'payment_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # التحقق من الدفع على Moyasar
+    try:
+        payment_data = get_payment(payment_id)
+    except Exception as e:
+        logger.error(f"Moyasar callback - payment fetch failed: {e}")
+        return Response({'error': 'تعذر التحقق من الدفع'}, status=status.HTTP_502_BAD_GATEWAY)
+
+    payment_status = payment_data.get('status')
+    metadata = payment_data.get('metadata', {})
+    program_id = metadata.get('program_id')
+    student_id = metadata.get('student_id')
+
+    if not program_id or not student_id:
+        return Response({'error': 'بيانات ناقصة'}, status=status.HTTP_400_BAD_REQUEST)
+
+    program = get_object_or_404(Program, id=program_id)
+
+    # لو الاشتراك موجود بالفعل
+    existing = Subscription.objects.filter(payment_id=payment_id).first()
+    if existing:
+        return Response({
+            'status': existing.payment_status,
+            'subscription_id': existing.id,
+        }, status=status.HTTP_200_OK)
+
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    student = get_object_or_404(User, id=student_id)
+    amount = payment_data.get('amount', 0) / 100
+
+    subscription = Subscription.objects.create(
+        student=student,
+        program=program,
+        payment_id=payment_id,
+        payment_status='paid' if payment_status == 'paid' else 'failed',
+        amount=amount,
+    )
+
+    if payment_status == 'paid':
+        _send_subscription_emails(subscription)
+
+    return Response({
+        'status': payment_status,
+        'subscription_id': subscription.id,
+    }, status=status.HTTP_200_OK)

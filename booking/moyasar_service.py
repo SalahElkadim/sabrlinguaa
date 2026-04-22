@@ -1,0 +1,57 @@
+import hmac
+import hashlib
+import requests
+from django.conf import settings
+
+MOYASAR_BASE_URL = "https://api.moyasar.com/v1"
+
+# أضيفها في moyasar_service.py
+
+def create_payment(amount_halalas: int, description: str, callback_url: str, metadata: dict = None) -> dict:
+    """
+    إنشاء طلب دفع جديد على Moyasar
+    amount_halalas: المبلغ بالهللة (السعر × 100)
+    """
+    payload = {
+        "amount": amount_halalas,
+        "currency": "SAR",
+        "description": description,
+        "callback_url": callback_url,
+        "source": {"type": "creditcard"},
+    }
+
+    if metadata:
+        payload["metadata"] = metadata
+
+    response = requests.post(
+        f"{MOYASAR_BASE_URL}/payments",
+        json=payload,
+        auth=(settings.MOYASAR_SECRET_KEY, ""),
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.json()
+
+def get_payment(payment_id: str) -> dict:
+    """
+    جلب تفاصيل الدفع من Moyasar عن طريق payment_id
+    """
+    response = requests.get(
+        f"{MOYASAR_BASE_URL}/payments/{payment_id}",
+        auth=(settings.MOYASAR_SECRET_KEY, ""),
+        timeout=10,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def verify_webhook_signature(payload: bytes, signature: str) -> bool:
+    """
+    التحقق من صحة الـ webhook القادم من Moyasar
+    """
+    expected = hmac.new(
+        settings.MOYASAR_WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)

@@ -20,7 +20,6 @@ class TeacherListSerializer(serializers.ModelSerializer):
             'profile_picture_url',
             'subject',
             'years_of_experience',
-            'session_price',
             'is_active',
             'bio',
             'average_rating','reviews_count',
@@ -41,7 +40,7 @@ class TeacherDetailSerializer(serializers.ModelSerializer):
         model = Teacher
         fields = [
             'id', 'name', 'profile_picture_url', 'subject',
-            'years_of_experience', 'session_price', 'bio',
+            'years_of_experience', 'bio',
             'is_active', 'created_at', 'updated_at',
             'average_rating', 'reviews_count',  # ← جديد
         ]
@@ -63,60 +62,14 @@ class TeacherCreateUpdateSerializer(serializers.ModelSerializer):
             'profile_picture',
             'subject',
             'years_of_experience',
-            'session_price',
             'bio',
             'is_active',
         ]
 
 
-# ============================================
-# BOOKING SERIALIZERS
-# ============================================
+from .models import Teacher, Review
 
-class BookingCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer لإنشاء حجز جديد
-    """
-    class Meta:
-        model = Booking
-        fields = [
-            'teacher',
-            'phone_number',
-            'requested_datetime',
-            'notes',
-        ]
-
-    def validate_requested_datetime(self, value):
-        from django.utils import timezone
-        if value < timezone.now():
-            raise serializers.ValidationError("لا يمكن الحجز في تاريخ سابق")
-        return value
-
-
-class BookingDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer تفصيلي للحجز
-    """
-    teacher = TeacherListSerializer(read_only=True)
-    student_name = serializers.CharField(source='student.full_name', read_only=True)
-    student_email = serializers.CharField(source='student.email', read_only=True)
-
-    class Meta:
-        model = Booking
-        fields = [
-            'id',
-            'student_name',
-            'student_email',
-            'teacher',
-            'phone_number',
-            'requested_datetime',
-            'notes',
-            'created_at',
-        ]
-
-from .models import Teacher, Booking, Review
-
-from .models import Teacher, Booking, Review
+from .models import Teacher, Review
 
 class ReviewSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.full_name', read_only=True)
@@ -155,3 +108,128 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
             )
 
         return data
+    
+
+from .models import Program, ProgramSchedule, Subscription, CustomProgram, CustomProgramSchedule
+
+
+# ============================================
+# PROGRAM SERIALIZERS
+# ============================================
+
+class ProgramScheduleSerializer(serializers.ModelSerializer):
+    day_display = serializers.CharField(source='get_day_of_week_display', read_only=True)
+
+    class Meta:
+        model = ProgramSchedule
+        fields = ['id', 'day_of_week', 'day_display', 'time']
+
+
+class ProgramListSerializer(serializers.ModelSerializer):
+    schedules = ProgramScheduleSerializer(many=True, read_only=True)
+    teacher_name = serializers.CharField(source='teacher.name', read_only=True)
+
+    class Meta:
+        model = Program
+        fields = [
+            'id', 'teacher', 'teacher_name', 'title', 'description',
+            'schedules', 'recurrence', 'duration', 'price', 'is_active',
+        ]
+
+
+class ProgramCreateUpdateSerializer(serializers.ModelSerializer):
+    schedules = ProgramScheduleSerializer(many=True)
+
+    class Meta:
+        model = Program
+        fields = [
+            'teacher', 'title', 'description',
+            'recurrence', 'duration', 'price', 'is_active', 'schedules',
+        ]
+
+    def create(self, validated_data):
+        schedules_data = validated_data.pop('schedules')
+        program = Program.objects.create(**validated_data)
+        for schedule in schedules_data:
+            ProgramSchedule.objects.create(program=program, **schedule)
+        return program
+
+    def update(self, instance, validated_data):
+        schedules_data = validated_data.pop('schedules', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if schedules_data is not None:
+            instance.schedules.all().delete()
+            for schedule in schedules_data:
+                ProgramSchedule.objects.create(program=instance, **schedule)
+
+        return instance
+
+
+# ============================================
+# SUBSCRIPTION SERIALIZERS
+# ============================================
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    program = ProgramListSerializer(read_only=True)
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+
+    class Meta:
+        model = Subscription
+        fields = [
+            'id', 'student_name', 'program',
+            'payment_id', 'payment_status', 'amount', 'created_at',
+        ]
+
+
+class SubscriptionCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subscription
+        fields = ['program', 'payment_id', 'amount']
+
+
+# ============================================
+# CUSTOM PROGRAM SERIALIZERS
+# ============================================
+
+class CustomProgramScheduleSerializer(serializers.ModelSerializer):
+    day_display = serializers.CharField(source='get_day_of_week_display', read_only=True)
+
+    class Meta:
+        model = CustomProgramSchedule
+        fields = ['id', 'day_of_week', 'day_display', 'time']
+
+
+class CustomProgramCreateSerializer(serializers.ModelSerializer):
+    schedules = CustomProgramScheduleSerializer(many=True)
+
+    class Meta:
+        model = CustomProgram
+        fields = [
+            'teacher', 'whatsapp_number', 'recurrence',
+            'duration', 'curriculum', 'schedules',
+        ]
+
+    def create(self, validated_data):
+        schedules_data = validated_data.pop('schedules')
+        custom_program = CustomProgram.objects.create(**validated_data)
+        for schedule in schedules_data:
+            CustomProgramSchedule.objects.create(
+                custom_program=custom_program, **schedule
+            )
+        return custom_program
+
+
+class CustomProgramDetailSerializer(serializers.ModelSerializer):
+    schedules = CustomProgramScheduleSerializer(many=True, read_only=True)
+    student_name = serializers.CharField(source='student.full_name', read_only=True)
+    teacher_name = serializers.CharField(source='teacher.name', read_only=True)
+
+    class Meta:
+        model = CustomProgram
+        fields = [
+            'id', 'student_name', 'teacher_name', 'whatsapp_number',
+            'recurrence', 'duration', 'curriculum', 'schedules', 'created_at',
+        ]
