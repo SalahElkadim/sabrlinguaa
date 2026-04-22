@@ -4,8 +4,8 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from .models import Teacher
 from .serializers import (
@@ -439,6 +439,7 @@ def my_subscriptions(request):
 
 @csrf_exempt
 @api_view(['POST'])
+@permission_classes([AllowAny])  
 def moyasar_webhook(request):
     """
     Webhook من Moyasar لتحديث حالة الدفع تلقائياً
@@ -636,37 +637,40 @@ def initiate_subscription_payment(request):
         'amount': program.price,
     }, status=status.HTTP_200_OK)
 
+
 @csrf_exempt
 @api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def subscription_payment_callback(request):
-    """
-    بيتكلمه React بعد ما Moyasar يعمل redirect
-    POST /booking/subscriptions/callback/
-    Body: { "id": "pay_xxxxxxxx" }
-    """
     payment_id = (
-    request.data.get('payment_id') or
-    request.data.get('id') or
-    request.query_params.get('id')
-)
+        request.data.get('payment_id') or
+        request.data.get('id') or
+        request.query_params.get('id')
+    )
 
     if not payment_id:
         return Response({'error': 'payment_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # التحقق من الدفع على Moyasar
     try:
         payment_data = get_payment(payment_id)
     except Exception as e:
         logger.error(f"Moyasar callback - payment fetch failed: {e}")
         return Response({'error': 'تعذر التحقق من الدفع'}, status=status.HTTP_502_BAD_GATEWAY)
 
+    if not payment_data or not isinstance(payment_data, dict):
+        return Response({'error': 'بيانات الدفع غير صالحة'}, status=status.HTTP_502_BAD_GATEWAY)
+
     payment_status = payment_data.get('status')
     metadata = payment_data.get('metadata') or {}
-    program_id = metadata.get('program_id')
+
+    # ✅ خد من metadata لو موجود، لو لأ خد من request.data
+    program_id = metadata.get('program_id') or request.data.get('program_id')
     student_id = metadata.get('student_id')
 
-    if not program_id or not student_id:
-        return Response({'error': 'بيانات ناقصة'}, status=status.HTTP_400_BAD_REQUEST)
+    logger.info(f"Callback - payment_id: {payment_id}, status: {payment_status}, program_id: {program_id}, student_id: {student_id}")
+
+    if not program_id:
+        return Response({'error': 'program_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
     program = get_object_or_404(Program, id=program_id)
 
@@ -680,7 +684,22 @@ def subscription_payment_callback(request):
 
     from django.contrib.auth import get_user_model
     User = get_user_model()
-    student = get_object_or_404(User, id=student_id)
+
+    # ✅ جيب الـ student من metadata أو من الـ Moyasar payment مباشرةً
+    if student_id:
+        student = get_object_or_404(User, id=student_id)
+    else:
+        # fallback: دور على الـ subscription الـ pending بنفس الـ program
+        pending = Subscription.objects.filter(
+            program=program,
+            payment_status='pending'
+        ).order_by('-id').first()
+        
+        if not pending:
+            return Response({'error': 'تعذر تحديد الطالب'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        student = pending.student
+
     amount = payment_data.get('amount', 0) / 100
 
     subscription = Subscription.objects.create(
