@@ -8,10 +8,6 @@ MOYASAR_BASE_URL = "https://api.moyasar.com/v1"
 # أضيفها في moyasar_service.py
 
 def create_payment(amount_halalas: int, description: str, callback_url: str, metadata: dict = None) -> dict:
-    """
-    إنشاء طلب دفع جديد على Moyasar
-    amount_halalas: المبلغ بالهللة (السعر × 100)
-    """
     payload = {
         "amount": amount_halalas,
         "currency": "SAR",
@@ -29,9 +25,12 @@ def create_payment(amount_halalas: int, description: str, callback_url: str, met
         auth=(settings.MOYASAR_SECRET_KEY, ""),
         timeout=10,
     )
-    response.raise_for_status()
+    
+    # ← أضيف السطرين دول عشان نشوف الـ error بالتفصيل
+    if not response.ok:
+        raise Exception(f"Moyasar error {response.status_code}: {response.text}")
+    
     return response.json()
-
 def get_payment(payment_id: str) -> dict:
     """
     جلب تفاصيل الدفع من Moyasar عن طريق payment_id
