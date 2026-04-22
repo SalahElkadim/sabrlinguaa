@@ -644,7 +644,11 @@ def subscription_payment_callback(request):
     POST /booking/subscriptions/callback/
     Body: { "id": "pay_xxxxxxxx" }
     """
-    payment_id = request.data.get('id') or request.query_params.get('id')
+    payment_id = (
+    request.data.get('payment_id') or
+    request.data.get('id') or
+    request.query_params.get('id')
+)
 
     if not payment_id:
         return Response({'error': 'payment_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
