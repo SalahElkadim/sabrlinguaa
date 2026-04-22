@@ -25,7 +25,8 @@ AI_GRADING_CONFIG = {
     'temperature': float(os.getenv('AI_GRADING_TEMPERATURE', '0.3')),
     'max_tokens': int(os.getenv('AI_GRADING_MAX_TOKENS', '1000')),
 }
-
+MOYASAR_SECRET_KEY = os.getenv('MOYASAR_SECRET_KEY')
+MOYASAR_WEBHOOK_SECRET = os.getenv('MOYASAR_WEBHOOK_SECRET')
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
