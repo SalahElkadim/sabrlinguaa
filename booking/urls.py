@@ -32,4 +32,6 @@ urlpatterns = [
     path('teachers/<int:teacher_id>/reviews/delete/', views.delete_review, name='delete_review'),
     path('subscriptions/pay/', views.initiate_subscription_payment, name='initiate_subscription_payment'),
     path('subscriptions/callback/', views.subscription_payment_callback, name='subscription_payment_callback'),
+    path('subscriptions/all/', views.all_subscriptions, name='all_subscriptions'),
+    path('subscriptions/<int:subscription_id>/delete/', views.delete_subscription, name='delete_subscription'),
 ]

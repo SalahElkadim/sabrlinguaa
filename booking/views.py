@@ -808,3 +808,47 @@ def subscription_payment_callback(request):
         'status': payment_status,
         'subscription_id': subscription.id,
     }, status=status.HTTP_200_OK)
+
+
+# ─── أضف ده في views.py ───
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def all_subscriptions(request):
+    """
+    عرض كل اشتراكات الطلاب (للأدمن)
+    GET /booking/subscriptions/all/
+    
+    ⚠️ ضيف permission_classes للتحقق إن المستخدم أدمن لو عندك نظام صلاحيات
+    مثال: @permission_classes([IsAuthenticated, IsAdminUser])
+    """
+    subscriptions = Subscription.objects.select_related(
+        'student', 'program__teacher'
+    ).prefetch_related(
+        'program__schedules'
+    ).order_by('-created_at')
+
+    serializer = SubscriptionSerializer(subscriptions, many=True)
+    return Response({
+        'total_subscriptions': subscriptions.count(),
+        'subscriptions': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_subscription(request, subscription_id):
+    """
+    حذف اشتراك (للأدمن)
+    DELETE /booking/subscriptions/{subscription_id}/delete/
+    """
+    from django.shortcuts import get_object_or_404
+    subscription = get_object_or_404(Subscription, id=subscription_id)
+    subscription.delete()
+    return Response({
+        'message': 'تم حذف الاشتراك بنجاح',
+        'subscription_id': subscription_id,
+    }, status=status.HTTP_200_OK)
+
+
+
