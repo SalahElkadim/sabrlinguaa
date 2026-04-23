@@ -59,6 +59,7 @@ class TeacherCreateUpdateSerializer(serializers.ModelSerializer):
         model = Teacher
         fields = [
             'name',
+            'email',  # ← أضف
             'profile_picture',
             'subject',
             'years_of_experience',
