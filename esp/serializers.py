@@ -341,3 +341,18 @@ class SpeakingVideoEspSerializer(serializers.Serializer):
         if obj.thumbnail:
             return obj.thumbnail.url
         return None
+    
+from .models import  StudentEspFavoriteCategory
+
+class StudentEspFavoriteCategorySerializer(serializers.ModelSerializer):
+    category = EspCategoryListSerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=EspCategory.objects.all(),
+        source='category',
+        write_only=True
+    )
+
+    class Meta:
+        model = StudentEspFavoriteCategory
+        fields = ['id', 'category', 'category_id', 'created_at']
+        read_only_fields = ['id', 'created_at']

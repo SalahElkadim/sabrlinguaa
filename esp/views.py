@@ -12,14 +12,14 @@ from .models import (
     EspCategory,
     EspSkill,
     StudentEspProgress,
-    StudentEspQuestionAttempt,
+    StudentEspQuestionAttempt,StudentEspFavoriteCategory
 )
 from .serializers import (
     EspCategoryListSerializer,
     EspCategoryDetailSerializer,
     EspSkillListSerializer,
     EspSkillDetailSerializer,
-    StudentEspProgressSerializer,
+    StudentEspProgressSerializer,StudentEspFavoriteCategorySerializer
 )
 
 import logging
@@ -1629,3 +1629,72 @@ def delete_writing_question(request, question_id):
     question = get_object_or_404(WritingQuestion, id=question_id, usage_type='ESP')
     question.delete()
     return Response({'message': 'تم حذف السؤال بنجاح'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_favorite_category(request, category_id):
+    """
+    POST /api/general/categories/{category_id}/favorite/
+    لو مش في المفضلة → يضيفها
+    لو موجودة → يشيلها (toggle)
+    """
+    category = get_object_or_404(EspCategory, id=category_id)
+    student = request.user
+
+    favorite, created = StudentEspFavoriteCategory.objects.get_or_create(
+        student=student,
+        category=category
+    )
+
+    if not created:
+        favorite.delete()
+        return Response({
+            'message': 'تم إزالة الكاتيجوري من المفضلة',
+            'is_favorite': False,
+            'category_id': category_id,
+        }, status=status.HTTP_200_OK)
+
+    return Response({
+        'message': 'تم إضافة الكاتيجوري إلى المفضلة',
+        'is_favorite': True,
+        'category_id': category_id,
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_favorite_categories(request):
+    """
+    GET /api/general/my-favorites/
+    عرض كل المفضلة للطالب الحالي
+    """
+    favorites = StudentEspFavoriteCategory.objects.filter(
+        student=request.user
+    ).select_related('category').order_by('-created_at')
+
+    serializer = StudentEspFavoriteCategorySerializer(favorites, many=True)
+
+    return Response({
+        'total_favorites': favorites.count(),
+        'favorites': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_favorite_status(request, category_id):
+    """
+    GET /api/esp/categories/{category_id}/favorite/status/
+    بيتحقق لو الكاتيجوري دي في مفضلة الطالب ولا لأ
+    """
+    category = get_object_or_404(EspCategory, id=category_id)
+    is_favorite = StudentEspFavoriteCategory.objects.filter(
+        student=request.user,
+        category=category
+    ).exists()
+
+    return Response({
+        'category_id': category_id,
+        'is_favorite': is_favorite,
+    }, status=status.HTTP_200_OK)
