@@ -34,4 +34,8 @@ urlpatterns = [
     path('subscriptions/callback/', views.subscription_payment_callback, name='subscription_payment_callback'),
     path('subscriptions/all/', views.all_subscriptions, name='all_subscriptions'),
     path('subscriptions/<int:subscription_id>/delete/', views.delete_subscription, name='delete_subscription'),
+    path('reports/me/', views.my_report, name='my_report'),
+    path('reports/students/<int:student_id>/', views.student_report_admin, name='student_report_admin'),
+    path('reports/me/pdf/',views.my_report_pdf,name='my_report_pdf'),
+    path('reports/students/<int:student_id>/pdf/', views.student_report_pdf_admin, name='student_report_pdf_admin'),
 ]

@@ -173,6 +173,20 @@ class Subscription(models.Model):
         verbose_name="المبلغ المدفوع"
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    reference_number = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        verbose_name="الرقم المرجعي"
+    )
+    def save(self, *args, **kwargs):
+        if not self.reference_number:
+            year = self.created_at.year if self.created_at else __import__('datetime').date.today().year
+            # save مؤقت عشان نجيب الـ id
+            super().save(*args, **kwargs)
+            self.reference_number = f"SBR-{year}-{self.id:05d}"
+            kwargs['force_insert'] = False
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = "اشتراك"

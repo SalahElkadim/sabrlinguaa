@@ -73,6 +73,12 @@ def _get_student_email_html(student, program, teacher, subscription, schedules_t
         <div style="border-top:1px dashed #e5e7eb;margin-top:10px;padding-top:10px;">
           <span style="color:#9ca3af;font-size:12px;">رقم العملية: {subscription.payment_id}</span>
         </div>
+        <tr>
+        <td style="padding:6px 0;color:#6b7280;font-size:14px;">الرقم المرجعي</td>
+        <td style="color:#16a34a;font-size:15px;font-weight:700;font-family:monospace;">
+            {subscription.reference_number}
+        </td>
+        </tr>
       </div>
 
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px;text-align:center;">
@@ -851,4 +857,297 @@ def delete_subscription(request, subscription_id):
     }, status=status.HTTP_200_OK)
 
 
+from django.contrib.auth import get_user_model
+from django.db.models import Sum, Count, Q, Max
+from django.utils import timezone
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
 
+User = get_user_model()
+
+
+def _build_student_report(user):
+    """
+    بيبني التقرير الكامل للطالب
+    """
+    from ielts.models import StudentIELTSProgress, StudentIELTSQuestionAttempt
+    from step.models import StudentSTEPProgress, StudentSTEPQuestionAttempt
+    from esp.models import StudentEspProgress, StudentEspQuestionAttempt
+    from general.models import StudentGeneralProgress, StudentGeneralQuestionAttempt
+    from .models import Subscription
+
+    # ─── 1. معلومات الطالب الأساسية ───────────────────────────
+    student_profile = getattr(user, 'student_profile', None)
+
+    basic_info = {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "user_type": user.user_type,
+        "date_joined": user.date_joined,
+        "is_email_verified": user.is_email_verified,
+        "phone_number": student_profile.phone_number if student_profile else None,
+    }
+
+    # ─── Helper: بيحسب إحصائيات Section معين ──────────────────
+    def _section_stats(progress_qs, attempts_qs):
+        """
+        progress_qs  → StudentXxxProgress queryset للطالب ده
+        attempts_qs  → StudentXxxQuestionAttempt queryset للطالب ده
+        """
+        # النقاط والأسئلة من الـ Progress
+        agg = progress_qs.aggregate(
+            total_score=Sum('total_score'),
+            total_solved=Sum('viewed_questions_count'),
+        )
+        total_score   = agg['total_score'] or 0
+        total_solved  = agg['total_solved'] or 0
+
+        # إحصائيات الـ Attempts
+        attempts_agg = attempts_qs.aggregate(
+            total_attempts=Count('id'),
+            correct_first_try=Count('id', filter=Q(is_solved=True, attempts_count=1)),
+            used_show_answer=Count('id', filter=Q(used_show_answer=True)),
+            total_solved_attempts=Count('id', filter=Q(is_solved=True)),
+        )
+        total_attempts        = attempts_agg['total_attempts'] or 0
+        correct_first_try     = attempts_agg['correct_first_try'] or 0
+        used_show_answer      = attempts_agg['used_show_answer'] or 0
+        total_solved_attempts = attempts_agg['total_solved_attempts'] or 0
+
+        # نسبة الصح/الغلط
+        correct_pct = round((total_solved_attempts / total_attempts * 100), 1) if total_attempts else 0
+        wrong_pct   = round(100 - correct_pct, 1) if total_attempts else 0
+
+        # نقاط per question_type
+        by_type = (
+            attempts_qs
+            .values('question_type')
+            .annotate(
+                attempts=Count('id'),
+                solved=Count('id', filter=Q(is_solved=True)),
+                score=Sum('points_earned'),
+            )
+            .order_by('question_type')
+        )
+
+        # آخر نشاط في هذا الـ section
+        last_activity = attempts_qs.aggregate(last=Max('created_at'))['last']
+
+        return {
+            "total_score": total_score,
+            "total_questions_solved": total_solved,
+            "total_attempts": total_attempts,
+            "correct_answers": total_solved_attempts,
+            "correct_percentage": correct_pct,
+            "wrong_percentage": wrong_pct,
+            "used_show_answer_count": used_show_answer,
+            "correct_on_first_try": correct_first_try,
+            "first_try_percentage": round((correct_first_try / total_attempts * 100), 1) if total_attempts else 0,
+            "last_activity": last_activity,
+            "by_question_type": list(by_type),
+        }
+
+    # ─── 2. إحصائيات كل Section ───────────────────────────────
+    ielts_stats = _section_stats(
+        StudentIELTSProgress.objects.filter(student=user),
+        StudentIELTSQuestionAttempt.objects.filter(student=user),
+    )
+    step_stats = _section_stats(
+        StudentSTEPProgress.objects.filter(student=user),
+        StudentSTEPQuestionAttempt.objects.filter(student=user),
+    )
+    esp_stats = _section_stats(
+        StudentEspProgress.objects.filter(student=user),
+        StudentEspQuestionAttempt.objects.filter(student=user),
+    )
+    general_stats = _section_stats(
+        StudentGeneralProgress.objects.filter(student=user),
+        StudentGeneralQuestionAttempt.objects.filter(student=user),
+    )
+
+    # ─── 3. الإجماليات الكلية ─────────────────────────────────
+    total_score_all = (
+        ielts_stats["total_score"] +
+        step_stats["total_score"] +
+        esp_stats["total_score"] +
+        general_stats["total_score"]
+    )
+    total_solved_all = (
+        ielts_stats["total_questions_solved"] +
+        step_stats["total_questions_solved"] +
+        esp_stats["total_questions_solved"] +
+        general_stats["total_questions_solved"]
+    )
+    total_attempts_all = (
+        ielts_stats["total_attempts"] +
+        step_stats["total_attempts"] +
+        esp_stats["total_attempts"] +
+        general_stats["total_attempts"]
+    )
+    total_correct_all = (
+        ielts_stats["correct_answers"] +
+        step_stats["correct_answers"] +
+        esp_stats["correct_answers"] +
+        general_stats["correct_answers"]
+    )
+
+    overall_correct_pct = round((total_correct_all / total_attempts_all * 100), 1) if total_attempts_all else 0
+
+    # آخر نشاط كلي
+    activity_dates = [
+        s["last_activity"] for s in [ielts_stats, step_stats, esp_stats, general_stats]
+        if s["last_activity"]
+    ]
+    last_activity_overall = max(activity_dates) if activity_dates else None
+
+    # ─── 4. الاشتراكات ────────────────────────────────────────
+    subscriptions = (
+        Subscription.objects
+        .filter(student=user)
+        .select_related('program__teacher')
+        .prefetch_related('program__schedules')
+        .order_by('-created_at')
+    )
+    subscriptions_data = []
+    for sub in subscriptions:
+        subscriptions_data.append({
+            "subscription_id": sub.id,
+            "reference_number": sub.reference_number,
+            "program_title": sub.program.title,
+            "teacher_name": sub.program.teacher.name,
+            "amount": sub.amount,
+            "payment_status": sub.payment_status,
+            "created_at": sub.created_at,
+        })
+
+    # ─── 5. إحصائيات إضافية ───────────────────────────────────
+    # أكتر question_type الطالب بيحله
+    all_attempts_by_type = {}
+    for section_stats in [ielts_stats, step_stats, esp_stats, general_stats]:
+        for item in section_stats["by_question_type"]:
+            qtype = item["question_type"]
+            if qtype not in all_attempts_by_type:
+                all_attempts_by_type[qtype] = {"attempts": 0, "solved": 0, "score": 0}
+            all_attempts_by_type[qtype]["attempts"] += item["attempts"]
+            all_attempts_by_type[qtype]["solved"]   += item["solved"]
+            all_attempts_by_type[qtype]["score"]    += item["score"] or 0
+
+    # ترتيب الـ question types بالـ score
+    sorted_by_score = sorted(
+        [{"question_type": k, **v} for k, v in all_attempts_by_type.items()],
+        key=lambda x: x["score"],
+        reverse=True,
+    )
+
+    strongest_skill = sorted_by_score[0]["question_type"] if sorted_by_score else None
+    weakest_skill   = sorted_by_score[-1]["question_type"] if len(sorted_by_score) > 1 else None
+
+    # أكتر section نشاطاً
+    sections_by_score = sorted([
+        {"section": "IELTS",   "score": ielts_stats["total_score"]},
+        {"section": "STEP",    "score": step_stats["total_score"]},
+        {"section": "ESP",     "score": esp_stats["total_score"]},
+        {"section": "General", "score": general_stats["total_score"]},
+    ], key=lambda x: x["score"], reverse=True)
+
+    most_active_section = sections_by_score[0]["section"] if sections_by_score else None
+
+    # ─── 6. تجميع التقرير ─────────────────────────────────────
+    return {
+        "generated_at": timezone.now(),
+        "basic_info": basic_info,
+
+        "overall_summary": {
+            "total_score": total_score_all,
+            "total_questions_solved": total_solved_all,
+            "total_attempts": total_attempts_all,
+            "correct_answers": total_correct_all,
+            "correct_percentage": overall_correct_pct,
+            "wrong_percentage": round(100 - overall_correct_pct, 1) if total_attempts_all else 0,
+            "last_activity": last_activity_overall,
+            "strongest_skill": strongest_skill,
+            "weakest_skill": weakest_skill,
+            "most_active_section": most_active_section,
+            "sections_ranking": sections_by_score,
+            "skills_breakdown": sorted_by_score,
+        },
+
+        "sections": {
+            "ielts":   ielts_stats,
+            "step":    step_stats,
+            "esp":     esp_stats,
+            "general": general_stats,
+        },
+
+        "subscriptions": {
+            "total": len(subscriptions_data),
+            "paid": sum(1 for s in subscriptions_data if s["payment_status"] == "paid"),
+            "list": subscriptions_data,
+        },
+    }
+
+
+# ─── Endpoint للأدمن ──────────────────────────────────────────
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_report_admin(request, student_id):
+    """
+    تقرير شامل لطالب معين — للأدمن فقط
+    GET /reports/students/{student_id}/
+
+    ⚠️ أضف IsAdminUser لو عندك permission system
+    """
+    user = get_object_or_404(User, id=student_id, user_type='student')
+    report = _build_student_report(user)
+    return Response(report, status=status.HTTP_200_OK)
+
+
+# ─── Endpoint للطالب نفسه ─────────────────────────────────────
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_report(request):
+    """
+    تقرير الطالب لنفسه
+    GET /reports/me/
+    """
+    report = _build_student_report(request.user)
+    return Response(report, status=status.HTTP_200_OK)
+
+# في views.py — أضف الاتنين دول
+
+from django.http import HttpResponse
+from .report_pdf import generate_student_report_pdf
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_report_pdf_admin(request, student_id):
+    """
+    PDF تقرير طالب معين — للأدمن
+    GET /reports/students/{student_id}/pdf/
+    """
+    user = get_object_or_404(User, id=student_id, user_type='student')
+    report = _build_student_report(user)
+    pdf_bytes = generate_student_report_pdf(report)
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="report_{user.id}.pdf"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_report_pdf(request):
+    """
+    الطالب يحمل تقرير نفسه PDF
+    GET /reports/me/pdf/
+    """
+    report = _build_student_report(request.user)
+    pdf_bytes = generate_student_report_pdf(report)
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="my_report.pdf"'
+    return response

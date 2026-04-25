@@ -54,3 +54,4 @@ urllib3==2.6.3
 user-agents==2.2.0
 vine==5.1.0
 whitenoise==6.9.0
+reportlab==4.4.10

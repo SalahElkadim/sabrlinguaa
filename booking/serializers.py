@@ -181,7 +181,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = [
             'id', 'student_name', 'program',
-            'payment_id', 'payment_status', 'amount', 'created_at',
+            'payment_id', 'payment_status', 'amount', 'created_at','reference_number', 
         ]
 
 
