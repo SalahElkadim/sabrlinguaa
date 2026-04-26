@@ -7,7 +7,8 @@ from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
 
-VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']
+# ✅ أضفنا GENERAL_PATH
+VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'GENERAL_PATH']
 
 
 @api_view(['POST'])
@@ -214,8 +215,8 @@ def generate_skill(request):
     POST /api/ielts/ai/generate-skill/
     Body:
     {
-        "skill_type": "VOCABULARY",
-        "skill_title": "Advanced Vocabulary",
+        "skill_type": "GENERAL_PATH",        ← أو أي نوع آخر
+        "skill_title": "Comprehensive IELTS Path",
         "skill_description": "...",
         "book_ids": [1, 2],
         "media_ids": [3],
@@ -224,6 +225,9 @@ def generate_skill(request):
         "no_hard": 5,
         "additional_notes": "..."
     }
+
+    للـ GENERAL_PATH: إجمالي الأسئلة (no_easy+no_medium+no_hard) يتوزع على
+    الأنواع الستة (Vocabulary, Grammar, Reading, Listening, Speaking, Writing).
     """
     from .ai_models import AIGenerationJob, ExtractedBook, ExtractedMedia
     from .tasks import generate_skill_task
@@ -256,7 +260,6 @@ def generate_skill(request):
         return Response({'error': 'يجب تحديد كتاب واحد على الأقل أو ميديا واحدة على الأقل'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # تأكد إن الـ content موجود وجاهز
         books = ExtractedBook.objects.filter(id__in=book_ids, status='DONE')
         media_qs = ExtractedMedia.objects.filter(id__in=media_ids, status='DONE')
 
@@ -274,7 +277,6 @@ def generate_skill(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # إنشاء الـ job
         job = AIGenerationJob.objects.create(
             skill_type=skill_type,
             skill_title=skill_title,
