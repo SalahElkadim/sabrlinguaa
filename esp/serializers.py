@@ -37,38 +37,10 @@ class EspCategoryListSerializer(serializers.ModelSerializer):
         return obj.skills.filter().count()
 
 
-class EspCategoryDetailSerializer(serializers.ModelSerializer):
-    total_questions = serializers.SerializerMethodField()
-    skills = serializers.SerializerMethodField()
-
-    class Meta:
-        model = EspCategory
-        fields = [
-            'id',
-            'name',
-            'description',
-            'icon',
-            'order',
-            'is_active',
-            'total_questions',
-            'skills',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-
-    def get_total_questions(self, obj):
-        return obj.get_total_questions_count()
-
-    def get_skills(self, obj):
-        skills = obj.skills.filter().order_by('order')
-        return EspSkillListSerializer(skills, many=True).data
-
-
 # serializers.py
 from cloudinary.uploader import upload as cloudinary_upload
 
-class GeneralCategoryDetailSerializer(serializers.ModelSerializer):
+class EspCategoryDetailSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
     skills = serializers.SerializerMethodField()
     icon = serializers.ImageField(write_only=True, required=False)

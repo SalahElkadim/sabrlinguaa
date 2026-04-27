@@ -12,14 +12,14 @@ from .models import (
     EspCategory,
     EspSkill,
     StudentEspProgress,
-    StudentEspQuestionAttempt,StudentEspFavoriteCategory
+    StudentEspQuestionAttempt,
 )
 from .serializers import (
     EspCategoryListSerializer,
     EspCategoryDetailSerializer,
     EspSkillListSerializer,
     EspSkillDetailSerializer,
-    StudentEspProgressSerializer,StudentEspFavoriteCategorySerializer
+    StudentEspProgressSerializer,
 )
 
 import logging
@@ -75,12 +75,13 @@ def _get_ordered_questions(queryset, order_type):
 
     return queryset.order_by('order', 'id')
 
-import cloudinary.utils
+import cloudinary
 
 def _get_cloudinary_url(field_value, resource_type='video'):
     if not field_value:
         return None
-    return cloudinary.utils.cloudinary_url(str(field_value), resource_type=resource_type)[0]
+    public_id = str(field_value)
+    return cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type)[0]
 # ============================================
 # 1. CATEGORY CRUD
 # ============================================
@@ -92,7 +93,8 @@ def list_categories(request):
     GET /api/esp/categories/
     """
     categories = EspCategory.objects.filter().order_by('order')
-    serializer = EspCategoryListSerializer(categories, many=True)
+    serializer = EspCategoryListSerializer(
+    categories, many=True, context={'request': request})
     return Response({
         'total_categories': categories.count(),
         'categories': serializer.data
@@ -473,41 +475,50 @@ def create_reading_question(request, passage_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_listening_audio(request):
-    """
-    POST /api/esp/listening/audio/create/
-    """
     from sabr_questions.models import ListeningAudio
 
-    data = request.data.copy()
-    required_fields = ['title', 'audio_file', 'esp_skill']
-    for field in required_fields:
-        if field not in data:
-            return Response({field: f'{field} مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+    data = request.data
+    audio_file = request.FILES.get('audio_file')
+
+    if not data.get('title'):
+        return Response({'title': 'العنوان مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+    if not data.get('esp_skill'):
+        return Response({'esp_skill': 'المهارة مطلوبة'}, status=status.HTTP_400_BAD_REQUEST)
+    if not audio_file:
+        return Response({'audio_file': 'ملف صوتي مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         skill = get_object_or_404(EspSkill, id=data.get('esp_skill'))
+        
         if skill.skill_type != 'LISTENING':
-            return Response({'error': 'هذه المهارة ليست من نوع Listening'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'هذه المهارة ليست من نوع Listening'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         audio = ListeningAudio.objects.create(
             title=data.get('title'),
-            audio_file=data.get('audio_file'),
+            audio_file=audio_file,
             transcript=data.get('transcript', ''),
-            duration=int(data.get('duration', 0)),
+            duration=int(data.get('duration', 0) or 0),
             usage_type='ESP',
             esp_skill=skill,
-            order=int(data.get('order', 0)),
-            is_active=data.get('is_active', True),
+            order=int(data.get('order', 0) or 0),
+            is_active=True,
             difficulty=data.get('difficulty', 'MEDIUM'),
         )
 
         return Response({
             'message': 'تم إنشاء التسجيل الصوتي بنجاح',
-            'audio': {'id': audio.id, 'title': audio.title, 'created_at': audio.created_at}
+            'audio': {
+                'id': audio.id,
+                'title': audio.title,
+                'created_at': audio.created_at
+            }
         }, status=status.HTTP_201_CREATED)
 
     except Exception as e:
-        logger.error(f"Error creating esp listening audio: {str(e)}")
+        logger.error(f"Error creating esp listening audio: {str(e)}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -886,6 +897,106 @@ def get_skill_questions(request, skill_id):
                 **get_attempt_data('WRITING', q.id),
             })
 
+    elif skill.skill_type == 'GENERAL_PATH':
+        for q in VocabularyQuestion.objects.filter(
+            esp_skill=skill, usage_type='ESP', is_active=True
+        ).order_by('order', 'id'):
+            questions_data.append({
+                'id': q.id, 'type': 'VOCABULARY',
+                'question_text': q.question_text,
+                'question_image': q.question_image.url if q.question_image else None,
+                'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                'correct_answer': q.correct_answer,
+                'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
+                **get_attempt_data('VOCABULARY', q.id),
+            })
+
+        for q in GrammarQuestion.objects.filter(
+            esp_skill=skill, usage_type='ESP', is_active=True
+        ).order_by('order', 'id'):
+            questions_data.append({
+                'id': q.id, 'type': 'GRAMMAR',
+                'question_text': q.question_text,
+                'question_image': q.question_image.url if q.question_image else None,
+                'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                'correct_answer': q.correct_answer,
+                'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
+                **get_attempt_data('GRAMMAR', q.id),
+            })
+
+        for passage in ReadingPassage.objects.filter(
+            esp_skill=skill, usage_type='ESP', is_active=True
+        ).order_by('order', 'id'):
+            passage_questions = []
+            for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
+                passage_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('READING', q.id),
+                })
+            questions_data.append({
+                'id': passage.id, 'type': 'READING',
+                'title': passage.title,
+                'passage_text': passage.passage_text,
+                'passage_image': passage.passage_image.url if passage.passage_image else None,
+                'source': passage.source,
+                'questions': passage_questions,
+                'difficulty': passage.difficulty,
+            })
+
+        for audio in ListeningAudio.objects.filter(
+            esp_skill=skill, usage_type='ESP', is_active=True
+        ).order_by('order', 'id'):
+            audio_questions = []
+            for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
+                audio_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('LISTENING', q.id),
+                })
+            questions_data.append({
+                'id': audio.id, 'type': 'LISTENING',
+                'title': audio.title,
+                'audio_file': _get_cloudinary_url(audio.audio_file, resource_type='video'),
+                'transcript': audio.transcript,
+                'duration': audio.duration,
+                'questions': audio_questions,
+                'difficulty': audio.difficulty,
+            })
+
+        for video in SpeakingVideo.objects.filter(
+            esp_skill=skill, usage_type='ESP', is_active=True
+        ).order_by('order', 'id'):
+            video_questions = []
+            for q in video.questions.filter(is_active=True).order_by('order', 'id'):
+                video_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('SPEAKING', q.id),
+                })
+            questions_data.append({
+                'id': video.id, 'type': 'SPEAKING',
+                'title': video.title,
+                'video_file': _get_cloudinary_url(video.video_file, resource_type='video'),
+                'thumbnail': _get_cloudinary_url(video.thumbnail, resource_type='image'),
+                'description': video.description,
+                'duration': video.duration,
+                'questions': video_questions,
+                'difficulty': video.difficulty,
+            })
     paginator = Paginator(questions_data, page_size)
 
     return Response({
@@ -1479,7 +1590,8 @@ def update_listening_audio(request, audio_id):
     data = request.data.copy()
     try:
         if 'title' in data: audio.title = data['title']
-        if 'audio_file' in data: audio.audio_file = data['audio_file']
+        audio_file = request.FILES.get('audio_file')
+        if audio_file: audio.audio_file = audio_file
         if 'transcript' in data: audio.transcript = data['transcript']
         if 'duration' in data: audio.duration = int(data['duration'])
         if 'is_active' in data: audio.is_active = data['is_active']
@@ -1543,7 +1655,8 @@ def update_speaking_video(request, video_id):
     data = request.data.copy()
     try:
         if 'title' in data: video.title = data['title']
-        if 'video_file' in data: video.video_file = data['video_file']
+        video_file = request.FILES.get('video_file')
+        if video_file: video.video_file = video_file
         if 'description' in data: video.description = data['description']
         if 'duration' in data: video.duration = int(data['duration'])
         if 'is_active' in data: video.is_active = data['is_active']
@@ -1630,12 +1743,26 @@ def delete_writing_question(request, question_id):
     question.delete()
     return Response({'message': 'تم حذف السؤال بنجاح'}, status=status.HTTP_200_OK)
 
+from .models import (
+    EspCategory, EspSkill,
+    StudentEspProgress, StudentEspQuestionAttempt,
+    StudentEspFavoriteCategory,
+)
+from .serializers import (
+    EspCategoryListSerializer,
+    EspCategoryDetailSerializer,
+    EspSkillListSerializer,
+    EspSkillDetailSerializer,
+    StudentEspProgressSerializer,
+    StudentEspFavoriteCategorySerializer,
+)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def toggle_favorite_category(request, category_id):
     """
-    POST /api/general/categories/{category_id}/favorite/
+    POST /api/esp/categories/{category_id}/favorite/
     لو مش في المفضلة → يضيفها
     لو موجودة → يشيلها (toggle)
     """
@@ -1666,7 +1793,7 @@ def toggle_favorite_category(request, category_id):
 @permission_classes([IsAuthenticated])
 def my_favorite_categories(request):
     """
-    GET /api/general/my-favorites/
+    GET /api/esp/my-favorites/
     عرض كل المفضلة للطالب الحالي
     """
     favorites = StudentEspFavoriteCategory.objects.filter(
