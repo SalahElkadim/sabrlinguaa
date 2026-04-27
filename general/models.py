@@ -77,6 +77,7 @@ class GeneralSkill(TimeStampedModel, OrderedModel):
         ('LISTENING', 'Listening'),
         ('WRITING', 'Writing'),
         ('SPEAKING', 'Speaking'),
+        ('GENERAL_PATH', 'General path'),
     ]
     ORDER_TYPE_CHOICES = [
         ('SEQUENTIAL', 'Sequential (Easy → Medium → Hard)'),
@@ -157,6 +158,26 @@ class GeneralSkill(TimeStampedModel, OrderedModel):
                 general_skill=self, usage_type='GENERAL', is_active=True
             )
             return sum(v.questions.filter(is_active=True).count() for v in videos)
+        elif skill_type == 'GENERAL_PATH':
+            from sabr_questions.models import (
+                VocabularyQuestion, GrammarQuestion,
+                ReadingPassage, ListeningAudio,
+            )
+            total = 0
+            total += VocabularyQuestion.objects.filter(general_skill=self, usage_type='GENERAL', is_active=True).count()
+            total += GrammarQuestion.objects.filter(general_skill=self, usage_type='GENERAL', is_active=True).count()
+            passages = ReadingPassage.objects.filter(general_skill=self, usage_type='GENERAL', is_active=True)
+            total += sum(p.get_questions_count() for p in passages)
+            audios = ListeningAudio.objects.filter(general_skill=self, usage_type='GENERAL', is_active=True)
+            total += sum(a.questions.filter(is_active=True).count() for a in audios)
+            videos = SpeakingVideo.objects.filter(general_skill=self, usage_type='GENERAL', is_active=True)
+            total += sum(v.questions.filter(is_active=True).count() for v in videos)
+            return total
+        elif skill_type == 'SPEAKING':
+            videos = SpeakingVideo.objects.filter(
+                general_skill=self, usage_type='GENERAL', is_active=True
+            )
+            return sum(v.questions.filter(is_active=True).count() for v in videos)
 
         return 0
 
@@ -208,7 +229,7 @@ class StudentGeneralProgress(TimeStampedModel):
 class StudentGeneralQuestionAttempt(TimeStampedModel):
     """
     يسجل كل محاولة للإجابة على سؤال في General.
-    نفس نظام IELTS بالظبط: 4 محاولات، نقاط تنازلية.
+    نفس نظام GENERAL بالظبط: 4 محاولات، نقاط تنازلية.
     """
     QUESTION_TYPE_CHOICES = [
         ('VOCABULARY', 'Vocabulary'),
