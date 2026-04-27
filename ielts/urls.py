@@ -84,4 +84,6 @@ urlpatterns = [
     path('ai/extract-media/<int:media_id>/status/', ai_views.extract_media_status, name='extract-media-status'),
     path('ai/generate-skill/', ai_views.generate_skill, name='generate-skill'),
     path('ai/jobs/<int:job_id>/status/', ai_views.generation_job_status, name='generation-job-status'),
+    path('ai/add-questions/', ai_views.add_questions_to_skill, name='add-questions-to-skill'),
+    
 ]
