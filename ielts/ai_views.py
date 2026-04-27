@@ -331,3 +331,127 @@ def generation_job_status(request, job_id):
         response_data['skill_title'] = job.skill.title
 
     return Response(response_data)
+
+# ============================================================
+# VIEW — Add Questions to Existing Skill
+# أضف ده في ai_views.py
+# ============================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_questions_to_skill(request):
+    """
+    POST /api/ielts/ai/add-questions/
+
+    بيضيف أسئلة جديدة على مهارة موجودة بالفعل بدون ما يمسح أي حاجة.
+
+    Body:
+    {
+        "skill_id": 5,              ← ID المهارة الموجودة (مطلوب)
+        "book_ids": [1, 2],         ← كتب مستخرجة (اختياري لو في media_ids)
+        "media_ids": [3],           ← ميديا مستخرجة (اختياري لو في book_ids)
+        "no_easy": 5,
+        "no_medium": 5,
+        "no_hard": 5,
+        "additional_notes": "..."   ← اختياري
+    }
+
+    Response:
+    {
+        "message": "بدأ توليد الأسئلة وإضافتها على المهارة",
+        "job_id": 12,
+        "skill_id": 5,
+        "skill_title": "IELTS Vocabulary",
+        "skill_type": "VOCABULARY",
+        "total_questions_requested": 15,
+        "status": "PENDING"
+    }
+    """
+    from .ai_models import AIGenerationJob, ExtractedBook, ExtractedMedia
+    from .models import IELTSSkill
+    from .tasks import add_questions_to_skill_task
+
+    data = request.data
+
+    # ── 1. جيب الـ skill الموجودة ──
+    skill_id = data.get('skill_id')
+    if not skill_id:
+        return Response(
+            {'error': 'skill_id مطلوب'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    skill = get_object_or_404(IELTSSkill, id=skill_id)
+
+    # ── 2. التحقق من الأسئلة المطلوبة ──
+    no_easy   = int(data.get('no_easy',   0))
+    no_medium = int(data.get('no_medium', 0))
+    no_hard   = int(data.get('no_hard',   0))
+
+    if no_easy + no_medium + no_hard == 0:
+        return Response(
+            {'error': 'يجب تحديد عدد الأسئلة (سهل أو متوسط أو صعب)'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # ── 3. التحقق من الـ content ──
+    book_ids  = data.get('book_ids',  [])
+    media_ids = data.get('media_ids', [])
+
+    if not book_ids and not media_ids:
+        return Response(
+            {'error': 'يجب تحديد كتاب واحد على الأقل أو ميديا واحدة على الأقل'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        books     = ExtractedBook.objects.filter(id__in=book_ids,  status='DONE')
+        media_qs  = ExtractedMedia.objects.filter(id__in=media_ids, status='DONE')
+
+        not_ready_books = set(int(x) for x in book_ids)  - set(books.values_list('id', flat=True))
+        not_ready_media = set(int(x) for x in media_ids) - set(media_qs.values_list('id', flat=True))
+
+        if not_ready_books:
+            return Response(
+                {'error': f'الكتب التالية غير جاهزة أو غير موجودة: {list(not_ready_books)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not_ready_media:
+            return Response(
+                {'error': f'الميديا التالية غير جاهزة أو غير موجودة: {list(not_ready_media)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # ── 4. إنشاء الـ job مع ربطه بالـ skill الموجودة مباشرةً ──
+        job = AIGenerationJob.objects.create(
+            skill=skill,                            # ← الـ skill الموجودة
+            skill_type=skill.skill_type,            # ← نفس نوع الـ skill
+            skill_title=skill.title,
+            skill_description=skill.description or '',
+            no_easy=no_easy,
+            no_medium=no_medium,
+            no_hard=no_hard,
+            additional_notes=data.get('additional_notes', ''),
+            status='PENDING',
+            created_by=request.user,
+        )
+        job.books.set(books)
+        job.media.set(media_qs)
+        job.save()
+
+        # ── 5. اطلق الـ task ──
+        add_questions_to_skill_task.delay(job.id)
+
+        return Response({
+            'message': 'بدأ توليد الأسئلة وإضافتها على المهارة',
+            'job_id': job.id,
+            'skill_id': skill.id,
+            'skill_title': skill.title,
+            'skill_type': skill.skill_type,
+            'total_questions_requested': job.total_questions_requested,
+            'status': job.status,
+        }, status=status.HTTP_202_ACCEPTED)
+
+    except Exception as e:
+        logger.error(f"[add_questions_to_skill] Error: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

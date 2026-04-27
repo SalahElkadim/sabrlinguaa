@@ -870,3 +870,75 @@ def _text_to_letter(options, correct_text):
         if option == correct_text:
             return chr(65 + idx)
     return None
+
+# ============================================================
+# TASK 4 — Add Questions to Existing Skill
+# أضف ده في tasks.py بعد generate_skill_task
+# ============================================================
+
+@shared_task(bind=True, max_retries=1)
+def add_questions_to_skill_task(self, job_id: int):
+    """
+    نفس فكرة generate_skill_task بالظبط،
+    الفرق الوحيد إنه بيستخدم skill موجودة بدل ما ينشئ واحدة جديدة.
+    """
+    from .ai_models import AIGenerationJob
+
+    job = AIGenerationJob.objects.get(id=job_id)
+    job.status = 'PROCESSING'
+    job.save(update_fields=['status'])
+
+    # الـ skill لازم تكون موجودة (بنحددها في الـ view قبل ما نعمل الـ task)
+    skill = job.skill
+    if not skill:
+        job.status = 'FAILED'
+        job.error_message = 'لم يتم تحديد مهارة موجودة'
+        job.save(update_fields=['status', 'error_message'])
+        return
+
+    try:
+        # ① جمع كل الـ content
+        content_parts = []
+
+        for book in job.books.filter(status='DONE'):
+            content_parts.append(
+                f"=== كتاب: {book.name} ===\n{book.extracted_text}"
+            )
+
+        for m in job.media.filter(status='DONE'):
+            content_parts.append(
+                f"=== ترانسكريبت: {m.name} ===\n{m.transcript}"
+            )
+
+        if not content_parts:
+            raise ValueError("لا يوجد محتوى جاهز (كتب أو ميديا) لإنشاء الأسئلة منه")
+
+        combined_content = "\n\n".join(content_parts)
+
+        # ② توليد الأسئلة وإضافتها على الـ skill الموجودة
+        questions_created = _generate_questions_for_skill(
+            skill=skill,
+            skill_type=skill.skill_type,   # نوع الـ skill الموجودة
+            content=combined_content,
+            no_easy=job.no_easy,
+            no_medium=job.no_medium,
+            no_hard=job.no_hard,
+            additional_notes=job.additional_notes or '',
+        )
+
+        job.status = 'DONE'
+        job.questions_created = questions_created
+        job.error_message = None
+        job.save(update_fields=['status', 'questions_created', 'error_message'])
+
+        logger.info(
+            f"[AddQuestions] Job #{job_id} done. "
+            f"Added {questions_created} questions to Skill #{skill.id} ({skill.title})"
+        )
+
+    except Exception as exc:
+        logger.error(f"[AddQuestions] Job #{job_id} failed: {str(exc)}")
+        job.status = 'FAILED'
+        job.error_message = str(exc)
+        job.save(update_fields=['status', 'error_message'])
+        raise self.retry(exc=exc, countdown=5)
