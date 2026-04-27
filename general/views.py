@@ -897,6 +897,106 @@ def get_skill_questions(request, skill_id):
                 **get_attempt_data('WRITING', q.id),
             })
 
+    elif skill.skill_type == 'GENERAL_PATH':
+        for q in VocabularyQuestion.objects.filter(
+            general_skill=skill, usage_type='GENERAL', is_active=True
+        ).order_by('order', 'id'):
+            questions_data.append({
+                'id': q.id, 'type': 'VOCABULARY',
+                'question_text': q.question_text,
+                'question_image': q.question_image.url if q.question_image else None,
+                'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                'correct_answer': q.correct_answer,
+                'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
+                **get_attempt_data('VOCABULARY', q.id),
+            })
+
+        for q in GrammarQuestion.objects.filter(
+            general_skill=skill, usage_type='GENERAL', is_active=True
+        ).order_by('order', 'id'):
+            questions_data.append({
+                'id': q.id, 'type': 'GRAMMAR',
+                'question_text': q.question_text,
+                'question_image': q.question_image.url if q.question_image else None,
+                'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                'correct_answer': q.correct_answer,
+                'explanation': q.explanation, 'points': q.points,
+                'difficulty': q.difficulty,
+                **get_attempt_data('GRAMMAR', q.id),
+            })
+
+        for passage in ReadingPassage.objects.filter(
+            general_skill=skill, usage_type='GENERAL', is_active=True
+        ).order_by('order', 'id'):
+            passage_questions = []
+            for q in passage.questions.filter(is_active=True).order_by('order', 'id'):
+                passage_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('READING', q.id),
+                })
+            questions_data.append({
+                'id': passage.id, 'type': 'READING',
+                'title': passage.title,
+                'passage_text': passage.passage_text,
+                'passage_image': passage.passage_image.url if passage.passage_image else None,
+                'source': passage.source,
+                'questions': passage_questions,
+                'difficulty': passage.difficulty,
+            })
+
+        for audio in ListeningAudio.objects.filter(
+            general_skill=skill, usage_type='GENERAL', is_active=True
+        ).order_by('order', 'id'):
+            audio_questions = []
+            for q in audio.questions.filter(is_active=True).order_by('order', 'id'):
+                audio_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('LISTENING', q.id),
+                })
+            questions_data.append({
+                'id': audio.id, 'type': 'LISTENING',
+                'title': audio.title,
+                'audio_file': _get_cloudinary_url(audio.audio_file, resource_type='video'),
+                'transcript': audio.transcript,
+                'duration': audio.duration,
+                'questions': audio_questions,
+                'difficulty': audio.difficulty,
+            })
+
+        for video in SpeakingVideo.objects.filter(
+            general_skill=skill, usage_type='GENERAL', is_active=True
+        ).order_by('order', 'id'):
+            video_questions = []
+            for q in video.questions.filter(is_active=True).order_by('order', 'id'):
+                video_questions.append({
+                    'id': q.id, 'question_text': q.question_text,
+                    'choice_a': q.choice_a, 'choice_b': q.choice_b,
+                    'choice_c': q.choice_c, 'choice_d': q.choice_d,
+                    'correct_answer': q.correct_answer,
+                    'explanation': q.explanation, 'points': q.points,
+                    **get_attempt_data('SPEAKING', q.id),
+                })
+            questions_data.append({
+                'id': video.id, 'type': 'SPEAKING',
+                'title': video.title,
+                'video_file': _get_cloudinary_url(video.video_file, resource_type='video'),
+                'thumbnail': _get_cloudinary_url(video.thumbnail, resource_type='image'),
+                'description': video.description,
+                'duration': video.duration,
+                'questions': video_questions,
+                'difficulty': video.difficulty,
+            })
     paginator = Paginator(questions_data, page_size)
 
     return Response({
