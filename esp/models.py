@@ -169,13 +169,13 @@ class EspSkill(TimeStampedModel, OrderedModel):
                 ReadingPassage, ListeningAudio,
             )
             total = 0
-            total += VocabularyQuestion.objects.filter(general_skill=self, usage_type='ESP', is_active=True).count()
-            total += GrammarQuestion.objects.filter(general_skill=self, usage_type='ESP', is_active=True).count()
-            passages = ReadingPassage.objects.filter(general_skill=self, usage_type='ESP', is_active=True)
+            total += VocabularyQuestion.objects.filter(esp_skill=self, usage_type='ESP', is_active=True).count()
+            total += GrammarQuestion.objects.filter(esp_skill=self, usage_type='ESP', is_active=True).count()
+            passages = ReadingPassage.objects.filter(esp_skill=self, usage_type='ESP', is_active=True)
             total += sum(p.get_questions_count() for p in passages)
-            audios = ListeningAudio.objects.filter(general_skill=self, usage_type='ESP', is_active=True)
+            audios = ListeningAudio.objects.filter(esp_skill=self, usage_type='ESP', is_active=True)
             total += sum(a.questions.filter(is_active=True).count() for a in audios)
-            videos = SpeakingVideo.objects.filter(general_skill=self, usage_type='ESP', is_active=True)
+            videos = SpeakingVideo.objects.filter(esp_skill=self, usage_type='ESP', is_active=True)
             total += sum(v.questions.filter(is_active=True).count() for v in videos)
             return total
         
