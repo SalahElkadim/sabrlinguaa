@@ -104,4 +104,6 @@ urlpatterns = [
     path('ai/generate-skill/', ai_views.generate_skill, name='generate-skill'),
     path('ai/jobs/', ai_views.list_generation_jobs, name='list-generation-jobs'),
     path('ai/jobs/<int:job_id>/status/', ai_views.generation_job_status, name='generation-job-status'),
+    path('ai/add-questions/', ai_views.add_questions_to_skill, name='esp-ai-add-questions'),
+
 ]

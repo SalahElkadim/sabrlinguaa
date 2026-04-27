@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
 
-VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']
+VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'GENERAL_PATH']
 
 
 # ============================================================
@@ -414,3 +414,104 @@ def list_generation_jobs(request):
             for j in qs[:50]
         ]
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_questions_to_skill(request):
+    """
+    POST /api/general/ai/add-questions/
+
+    Body:
+    {
+        "skill_id": 5,
+        "book_ids": [1, 2],
+        "media_ids": [3],
+        "no_easy": 5,
+        "no_medium": 5,
+        "no_hard": 5,
+        "additional_notes": "..."
+    }
+    """
+    from .ai_models import GeneralAIGenerationJob, GeneralExtractedBook, GeneralExtractedMedia
+    from .models import GeneralSkill
+    from .tasks import general_add_questions_to_skill_task
+
+    data = request.data
+
+    skill_id = data.get('skill_id')
+    if not skill_id:
+        return Response({'error': 'skill_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    skill = get_object_or_404(GeneralSkill, id=skill_id)
+
+    no_easy   = int(data.get('no_easy',   0))
+    no_medium = int(data.get('no_medium', 0))
+    no_hard   = int(data.get('no_hard',   0))
+
+    if no_easy + no_medium + no_hard == 0:
+        return Response(
+            {'error': 'يجب تحديد عدد الأسئلة (سهل أو متوسط أو صعب)'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    book_ids  = data.get('book_ids',  [])
+    media_ids = data.get('media_ids', [])
+
+    if not book_ids and not media_ids:
+        return Response(
+            {'error': 'يجب تحديد كتاب واحد على الأقل أو ميديا واحدة على الأقل'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        books    = GeneralExtractedBook.objects.filter(id__in=book_ids,  status='DONE')
+        media_qs = GeneralExtractedMedia.objects.filter(id__in=media_ids, status='DONE')
+
+        not_ready_books = set(int(x) for x in book_ids)  - set(books.values_list('id', flat=True))
+        not_ready_media = set(int(x) for x in media_ids) - set(media_qs.values_list('id', flat=True))
+
+        if not_ready_books:
+            return Response(
+                {'error': f'الكتب التالية غير جاهزة أو غير موجودة: {list(not_ready_books)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not_ready_media:
+            return Response(
+                {'error': f'الميديا التالية غير جاهزة أو غير موجودة: {list(not_ready_media)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        job = GeneralAIGenerationJob.objects.create(
+            category=skill.category,        # ← نربطه بنفس كاتيجوري الـ skill
+            skill=skill,                    # ← الـ skill الموجودة مباشرةً
+            skill_type=skill.skill_type,
+            skill_title=skill.title,
+            skill_description=skill.description or '',
+            no_easy=no_easy,
+            no_medium=no_medium,
+            no_hard=no_hard,
+            additional_notes=data.get('additional_notes', ''),
+            status='PENDING',
+            created_by=request.user,
+        )
+        job.books.set(books)
+        job.media.set(media_qs)
+        job.save()
+
+        general_add_questions_to_skill_task.delay(job.id)
+
+        return Response({
+            'message': 'بدأ توليد الأسئلة وإضافتها على المهارة',
+            'job_id': job.id,
+            'skill_id': skill.id,
+            'skill_title': skill.title,
+            'skill_type': skill.skill_type,
+            'category_id': skill.category.id,
+            'category_name': skill.category.name,
+            'total_questions_requested': job.total_questions_requested,
+            'status': job.status,
+        }, status=status.HTTP_202_ACCEPTED)
+
+    except Exception as e:
+        logger.error(f"[General add_questions_to_skill] Error: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

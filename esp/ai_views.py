@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
 
-VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING']
+VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'ESP_PATH']
 
 
 # ============================================================
@@ -366,7 +366,6 @@ def generation_job_status(request, job_id):
 
     return Response(response_data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def list_generation_jobs(request):
@@ -375,12 +374,26 @@ def list_generation_jobs(request):
     فلترة اختيارية بالكاتيجوري: ?category_id=3
     """
     from .ai_models import EspAIGenerationJob
+    from sabr_questions.models import ListeningAudio, SpeakingVideo
 
     qs = EspAIGenerationJob.objects.select_related('category', 'skill').order_by('-created_at')
 
     category_id = request.query_params.get('category_id')
     if category_id:
         qs = qs.filter(category_id=category_id)
+
+    def get_media_ids(j):
+        if j.skill_type == 'LISTENING' and j.skill:
+            audio = ListeningAudio.objects.filter(
+                esp_skill=j.skill, usage_type='ESP'
+            ).first()
+            return {'audio_id': audio.id if audio else None, 'video_id': None}
+        elif j.skill_type == 'SPEAKING' and j.skill:
+            video = SpeakingVideo.objects.filter(
+                esp_skill=j.skill, usage_type='ESP'
+            ).first()
+            return {'audio_id': None, 'video_id': video.id if video else None}
+        return {'audio_id': None, 'video_id': None}
 
     return Response({
         'jobs': [
@@ -394,8 +407,111 @@ def list_generation_jobs(request):
                 'skill_id': j.skill.id if j.skill else None,
                 'total_questions_requested': j.total_questions_requested,
                 'questions_created': j.questions_created,
+                'error_message': j.error_message,
                 'created_at': j.created_at,
+                **get_media_ids(j),
             }
             for j in qs[:50]
         ]
     })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_questions_to_skill(request):
+    """
+    POST /api/esp/ai/add-questions/
+
+    Body:
+    {
+        "skill_id": 5,
+        "book_ids": [1, 2],
+        "media_ids": [3],
+        "no_easy": 5,
+        "no_medium": 5,
+        "no_hard": 5,
+        "additional_notes": "..."
+    }
+    """
+    from .ai_models import EspAIGenerationJob, EspExtractedBook, EspExtractedMedia
+    from .models import EspSkill
+    from .tasks import esp_add_questions_to_skill_task
+
+    data = request.data
+
+    skill_id = data.get('skill_id')
+    if not skill_id:
+        return Response({'error': 'skill_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    skill = get_object_or_404(EspSkill, id=skill_id)
+
+    no_easy   = int(data.get('no_easy',   0))
+    no_medium = int(data.get('no_medium', 0))
+    no_hard   = int(data.get('no_hard',   0))
+
+    if no_easy + no_medium + no_hard == 0:
+        return Response(
+            {'error': 'يجب تحديد عدد الأسئلة (سهل أو متوسط أو صعب)'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    book_ids  = data.get('book_ids',  [])
+    media_ids = data.get('media_ids', [])
+
+    if not book_ids and not media_ids:
+        return Response(
+            {'error': 'يجب تحديد كتاب واحد على الأقل أو ميديا واحدة على الأقل'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        books    = EspExtractedBook.objects.filter(id__in=book_ids,  status='DONE')
+        media_qs = EspExtractedMedia.objects.filter(id__in=media_ids, status='DONE')
+
+        not_ready_books = set(int(x) for x in book_ids)  - set(books.values_list('id', flat=True))
+        not_ready_media = set(int(x) for x in media_ids) - set(media_qs.values_list('id', flat=True))
+
+        if not_ready_books:
+            return Response(
+                {'error': f'الكتب التالية غير جاهزة أو غير موجودة: {list(not_ready_books)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not_ready_media:
+            return Response(
+                {'error': f'الميديا التالية غير جاهزة أو غير موجودة: {list(not_ready_media)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        job = EspAIGenerationJob.objects.create(
+            category=skill.category,        # ← نربطه بنفس كاتيجوري الـ skill
+            skill=skill,                    # ← الـ skill الموجودة مباشرةً
+            skill_type=skill.skill_type,
+            skill_title=skill.title,
+            skill_description=skill.description or '',
+            no_easy=no_easy,
+            no_medium=no_medium,
+            no_hard=no_hard,
+            additional_notes=data.get('additional_notes', ''),
+            status='PENDING',
+            created_by=request.user,
+        )
+        job.books.set(books)
+        job.media.set(media_qs)
+        job.save()
+
+        esp_add_questions_to_skill_task.delay(job.id)
+
+        return Response({
+            'message': 'بدأ توليد الأسئلة وإضافتها على المهارة',
+            'job_id': job.id,
+            'skill_id': skill.id,
+            'skill_title': skill.title,
+            'skill_type': skill.skill_type,
+            'category_id': skill.category.id,
+            'category_name': skill.category.name,
+            'total_questions_requested': job.total_questions_requested,
+            'status': job.status,
+        }, status=status.HTTP_202_ACCEPTED)
+
+    except Exception as e:
+        logger.error(f"[Esp add_questions_to_skill] Error: {str(e)}")
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

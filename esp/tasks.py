@@ -254,10 +254,34 @@ def _generate_and_save_questions(skill, skill_type, content, no_easy, no_medium,
 
     return _save_questions(skill=skill, skill_type=skill_type, data=data)
 
-
 def _build_prompt(skill_type, content, no_easy, no_medium, no_hard, additional_notes, schema):
     total = no_easy + no_medium + no_hard
     notes_section = f"\nملاحظات إضافية يجب مراعاتها:\n{additional_notes}" if additional_notes else ""
+
+    # ESP_PATH له prompt مختلف
+    if skill_type == 'ESP_PATH':
+        type_instruction = (
+            f"نوع المهارة: ESP_PATH (مسار شامل)\n"
+            f"يجب توليد أسئلة من كل الأنواع التالية معاً في نفس الـ JSON:\n"
+            f"  - vocabulary_questions: أسئلة مفردات (MCQ)\n"
+            f"  - grammar_questions: أسئلة قواعد (MCQ)\n"
+            f"  - passages: قطع قراءة مع أسئلة\n"
+            f"  - audios: نصوص استماع (transcript فقط) مع أسئلة\n"
+            f"  - videos: نصوص speaking (transcript فقط) مع أسئلة\n"
+            f"  - writing_questions: أسئلة كتابة\n\n"
+            f"إجمالي الأسئلة المطلوبة: {total}\n"
+            f"وزّعها بالتساوي على الأنواع الستة قدر الإمكان.\n"
+            f"توزيع الصعوبة الإجمالي — سهل (EASY): {no_easy} / متوسط (MEDIUM): {no_medium} / صعب (HARD): {no_hard}\n"
+            f"طبّق توزيع الصعوبة على كل نوع بشكل متناسب."
+        )
+    else:
+        type_instruction = (
+            f"نوع المهارة: {skill_type}\n"
+            f"- إجمالي الأسئلة: {total}\n"
+            f"  - سهل (EASY): {no_easy}\n"
+            f"  - متوسط (MEDIUM): {no_medium}\n"
+            f"  - صعب (HARD): {no_hard}"
+        )
 
     return f"""أنت مساعد متخصص في إنشاء أسئلة تعليمية.
 
@@ -265,11 +289,7 @@ def _build_prompt(skill_type, content, no_easy, no_medium, no_hard, additional_n
 {content}
 
 المطلوب:
-- نوع المهارة: {skill_type}
-- إجمالي الأسئلة: {total}
-  - سهل (EASY): {no_easy}
-  - متوسط (MEDIUM): {no_medium}
-  - صعب (HARD): {no_hard}
+{type_instruction}
 {notes_section}
 
 التعليمات:
@@ -280,7 +300,6 @@ def _build_prompt(skill_type, content, no_easy, no_medium, no_hard, additional_n
 5. التزم بالـ schema التالي تماماً:
 
 {schema}"""
-
 
 def _get_schema_for_skill_type(skill_type):
     schemas = {
@@ -373,6 +392,87 @@ def _get_schema_for_skill_type(skill_type):
       "question_text": "Write an essay discussing the main environmental challenges facing the world today and suggest possible solutions.",
       "sample_answer": "The world today faces numerous environmental challenges...",
       "rubric": "1. Content (4 points): addresses the topic fully\\n2. Organization (3 points): clear intro, body, conclusion\\n3. Language (3 points): grammar and vocabulary accuracy",
+      "difficulty": "HARD",
+      "min_words": 200,
+      "max_words": 400
+    }
+  ]
+}''',
+
+   'ESP_PATH': '''
+{
+  "vocabulary_questions": [
+    {
+      "question_text": "Choose the correct meaning of 'resilient':",
+      "options": ["weak", "adaptable", "careless", "loud"],
+      "correct_answer": "adaptable",
+      "explanation": "Resilient means able to recover quickly from difficulties.",
+      "difficulty": "MEDIUM"
+    }
+  ],
+  "grammar_questions": [
+    {
+      "question_text": "Choose the correct form: By next year, she ___ her degree.",
+      "options": ["will complete", "will have completed", "completes", "completed"],
+      "correct_answer": "will have completed",
+      "explanation": "Future perfect is used for actions completed before a future point.",
+      "difficulty": "HARD"
+    }
+  ],
+  "passages": [
+    {
+      "title": "The Role of Technology in Education",
+      "passage_text": "Technology has revolutionized the way students learn...",
+      "difficulty": "MEDIUM",
+      "questions": [
+        {
+          "question_text": "What is the main argument of the passage?",
+          "options": ["Technology harms education", "Technology improves learning", "Students dislike technology", "Schools ban technology"],
+          "correct_answer": "Technology improves learning",
+          "explanation": "The passage discusses positive impacts of technology.",
+          "difficulty": "MEDIUM"
+        }
+      ]
+    }
+  ],
+  "audios": [
+    {
+      "title": "A conversation about travel plans",
+      "transcript": "A: Where are you planning to go for your holiday?\\nB: I am thinking of visiting Japan...",
+      "difficulty": "EASY",
+      "questions": [
+        {
+          "question_text": "Where does person B want to travel?",
+          "options": ["China", "Japan", "Korea", "Thailand"],
+          "correct_answer": "Japan",
+          "explanation": "Person B clearly states they want to visit Japan.",
+          "difficulty": "EASY"
+        }
+      ]
+    }
+  ],
+  "videos": [
+    {
+      "title": "Talking about your hometown",
+      "transcript": "Hello everyone. Today I want to talk about my hometown, Cairo...",
+      "difficulty": "EASY",
+      "questions": [
+        {
+          "question_text": "What city does the speaker talk about?",
+          "options": ["Alexandria", "Cairo", "Luxor", "Aswan"],
+          "correct_answer": "Cairo",
+          "explanation": "The speaker explicitly mentions Cairo as their hometown.",
+          "difficulty": "EASY"
+        }
+      ]
+    }
+  ],
+  "writing_questions": [
+    {
+      "title": "Opinion Essay",
+      "question_text": "Some people believe that technology has made our lives more complicated. Do you agree or disagree?",
+      "sample_answer": "In today\'s world, technology plays an integral role...",
+      "rubric": "1. Task Response (4 pts)\\n2. Coherence (3 pts)\\n3. Language (3 pts)",
       "difficulty": "HARD",
       "min_words": 200,
       "max_words": 400
@@ -571,6 +671,192 @@ def _save_questions(skill, skill_type, data):
             )
             count += 1
 
+    elif skill_type == 'ESP_PATH':
+        from sabr_questions.models import (
+            VocabularyQuestion, VocabularyQuestionSet,
+            GrammarQuestion, GrammarQuestionSet,
+            ReadingPassage, ReadingQuestion,
+            ListeningAudio, ListeningQuestion,
+            WritingQuestion,
+            SpeakingVideo, SpeakingQuestion,
+        )
+
+        # ── Vocabulary ──
+        if data.get('vocabulary_questions'):
+            q_set, _ = VocabularyQuestionSet.objects.get_or_create(
+                title='Esp Vocabulary Questions',
+                usage_type='ESP',
+                defaults={'description': 'Auto-generated set for Esp'}
+            )
+            for q in data['vocabulary_questions']:
+                options = q.get('options', [])
+                correct_letter = _text_to_letter(options, q.get('correct_answer', ''))
+                if not correct_letter:
+                    continue
+                VocabularyQuestion.objects.create(
+                    question_set=q_set,
+                    question_text=q.get('question_text', ''),
+                    choice_a=options[0] if len(options) > 0 else '',
+                    choice_b=options[1] if len(options) > 1 else '',
+                    choice_c=options[2] if len(options) > 2 else '',
+                    choice_d=options[3] if len(options) > 3 else '',
+                    correct_answer=correct_letter,
+                    explanation=q.get('explanation', ''),
+                    points=1,
+                    usage_type='ESP',
+                    esp_skill=skill,
+                    is_active=True,
+                    order=0,
+                    difficulty=q.get('difficulty', 'MEDIUM'),
+                )
+                count += 1
+
+        # ── Grammar ──
+        if data.get('grammar_questions'):
+            q_set, _ = GrammarQuestionSet.objects.get_or_create(
+                title='Esp Grammar Questions',
+                usage_type='ESP',
+                defaults={'description': 'Auto-generated set for Esp'}
+            )
+            for q in data['grammar_questions']:
+                options = q.get('options', [])
+                correct_letter = _text_to_letter(options, q.get('correct_answer', ''))
+                if not correct_letter:
+                    continue
+                GrammarQuestion.objects.create(
+                    question_set=q_set,
+                    question_text=q.get('question_text', ''),
+                    choice_a=options[0] if len(options) > 0 else '',
+                    choice_b=options[1] if len(options) > 1 else '',
+                    choice_c=options[2] if len(options) > 2 else '',
+                    choice_d=options[3] if len(options) > 3 else '',
+                    correct_answer=correct_letter,
+                    explanation=q.get('explanation', ''),
+                    points=1,
+                    usage_type='ESP',
+                    esp_skill=skill,
+                    is_active=True,
+                    order=0,
+                    difficulty=q.get('difficulty', 'MEDIUM'),
+                )
+                count += 1
+
+        # ── Reading ──
+        for passage_data in data.get('passages', []):
+            passage = ReadingPassage.objects.create(
+                title=passage_data.get('title', 'AI Generated Passage'),
+                passage_text=passage_data.get('passage_text', ''),
+                usage_type='ESP',
+                esp_skill=skill,
+                is_active=True,
+                order=0,
+                difficulty=passage_data.get('difficulty', 'MEDIUM'),
+            )
+            for q in passage_data.get('questions', []):
+                options = q.get('options', [])
+                correct_letter = _text_to_letter(options, q.get('correct_answer', ''))
+                if not correct_letter:
+                    continue
+                ReadingQuestion.objects.create(
+                    passage=passage,
+                    question_text=q.get('question_text', ''),
+                    choice_a=options[0] if len(options) > 0 else '',
+                    choice_b=options[1] if len(options) > 1 else '',
+                    choice_c=options[2] if len(options) > 2 else '',
+                    choice_d=options[3] if len(options) > 3 else '',
+                    correct_answer=correct_letter,
+                    explanation=q.get('explanation', ''),
+                    points=1,
+                    is_active=True,
+                    order=0,
+                    difficulty=q.get('difficulty', 'MEDIUM'),
+                )
+                count += 1
+
+        # ── Listening ──
+        for audio_data in data.get('audios', []):
+            audio = ListeningAudio.objects.create(
+                title=audio_data.get('title', 'AI Generated Audio'),
+                audio_file='',
+                transcript=audio_data.get('transcript', ''),
+                duration=0,
+                usage_type='ESP',
+                esp_skill=skill,
+                is_active=True,
+                order=0,
+                difficulty=audio_data.get('difficulty', 'MEDIUM'),
+            )
+            for q in audio_data.get('questions', []):
+                options = q.get('options', [])
+                correct_letter = _text_to_letter(options, q.get('correct_answer', ''))
+                if not correct_letter:
+                    continue
+                ListeningQuestion.objects.create(
+                    audio=audio,
+                    question_text=q.get('question_text', ''),
+                    choice_a=options[0] if len(options) > 0 else '',
+                    choice_b=options[1] if len(options) > 1 else '',
+                    choice_c=options[2] if len(options) > 2 else '',
+                    choice_d=options[3] if len(options) > 3 else '',
+                    correct_answer=correct_letter,
+                    explanation=q.get('explanation', ''),
+                    points=1,
+                    is_active=True,
+                    order=0,
+                )
+                count += 1
+
+        # ── Speaking ──
+        for video_data in data.get('videos', []):
+            video = SpeakingVideo.objects.create(
+                title=video_data.get('title', 'AI Generated Video'),
+                video_file='',
+                description=video_data.get('transcript', ''),
+                duration=0,
+                usage_type='ESP',
+                esp_skill=skill,
+                is_active=True,
+                order=0,
+                difficulty=video_data.get('difficulty', 'MEDIUM'),
+            )
+            for q in video_data.get('questions', []):
+                options = q.get('options', [])
+                correct_letter = _text_to_letter(options, q.get('correct_answer', ''))
+                if not correct_letter:
+                    continue
+                SpeakingQuestion.objects.create(
+                    video=video,
+                    question_text=q.get('question_text', ''),
+                    choice_a=options[0] if len(options) > 0 else '',
+                    choice_b=options[1] if len(options) > 1 else '',
+                    choice_c=options[2] if len(options) > 2 else '',
+                    choice_d=options[3] if len(options) > 3 else '',
+                    correct_answer=correct_letter,
+                    explanation=q.get('explanation', ''),
+                    points=1,
+                    is_active=True,
+                    order=0,
+                )
+                count += 1
+
+        # ── Writing ──
+        for q in data.get('writing_questions', []):
+            WritingQuestion.objects.create(
+                title=q.get('title', 'AI Generated Question'),
+                question_text=q.get('question_text', ''),
+                sample_answer=q.get('sample_answer', ''),
+                rubric=q.get('rubric', ''),
+                min_words=q.get('min_words', 150),
+                max_words=q.get('max_words', 400),
+                usage_type='ESP',
+                esp_skill=skill,
+                points=10,
+                is_active=True,
+                order=0,
+                difficulty=q.get('difficulty', 'MEDIUM'),
+            )
+            count += 1
+
     return count
 
 
@@ -579,3 +865,67 @@ def _text_to_letter(options, correct_text):
         if option == correct_text:
             return chr(65 + idx)
     return None
+
+
+@shared_task(bind=True, max_retries=1)
+def esp_add_questions_to_skill_task(self, job_id: int):
+    """
+    يضيف أسئلة على EspSkill موجودة بدون ما يمسح أي حاجة.
+    """
+    from .ai_models import EspAIGenerationJob
+
+    job = EspAIGenerationJob.objects.get(id=job_id)
+    job.status = 'PROCESSING'
+    job.save(update_fields=['status'])
+
+    skill = job.skill
+    if not skill:
+        job.status = 'FAILED'
+        job.error_message = 'لم يتم تحديد مهارة موجودة'
+        job.save(update_fields=['status', 'error_message'])
+        return
+
+    try:
+        content_parts = []
+
+        for book in job.books.filter(status='DONE'):
+            content_parts.append(
+                f"=== كتاب: {book.name} ===\n{book.extracted_text}"
+            )
+
+        for m in job.media.filter(status='DONE'):
+            content_parts.append(
+                f"=== ترانسكريبت: {m.name} ===\n{m.transcript}"
+            )
+
+        if not content_parts:
+            raise ValueError("لا يوجد محتوى جاهز (كتب أو ميديا) لإنشاء الأسئلة منه")
+
+        combined_content = "\n\n".join(content_parts)
+
+        questions_created = _generate_and_save_questions(
+            skill=skill,
+            skill_type=skill.skill_type,
+            content=combined_content,
+            no_easy=job.no_easy,
+            no_medium=job.no_medium,
+            no_hard=job.no_hard,
+            additional_notes=job.additional_notes or '',
+        )
+
+        job.status = 'DONE'
+        job.questions_created = questions_created
+        job.error_message = None
+        job.save(update_fields=['status', 'questions_created', 'error_message'])
+
+        logger.info(
+            f"[Esp AddQuestions] Job #{job_id} done. "
+            f"Added {questions_created} questions to Skill #{skill.id} ({skill.title})"
+        )
+
+    except Exception as exc:
+        logger.error(f"[Esp AddQuestions] Job #{job_id} failed: {str(exc)}")
+        job.status = 'FAILED'
+        job.error_message = str(exc)
+        job.save(update_fields=['status', 'error_message'])
+        raise self.retry(exc=exc, countdown=5)
