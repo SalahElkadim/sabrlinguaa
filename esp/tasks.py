@@ -258,10 +258,10 @@ def _build_prompt(skill_type, content, no_easy, no_medium, no_hard, additional_n
     total = no_easy + no_medium + no_hard
     notes_section = f"\nملاحظات إضافية يجب مراعاتها:\n{additional_notes}" if additional_notes else ""
 
-    # ESP_PATH له prompt مختلف
-    if skill_type == 'ESP_PATH':
+    # GENERAL_PATH له prompt مختلف
+    if skill_type == 'GENERAL_PATH':
         type_instruction = (
-            f"نوع المهارة: ESP_PATH (مسار شامل)\n"
+            f"نوع المهارة: GENERAL_PATH (مسار شامل)\n"
             f"يجب توليد أسئلة من كل الأنواع التالية معاً في نفس الـ JSON:\n"
             f"  - vocabulary_questions: أسئلة مفردات (MCQ)\n"
             f"  - grammar_questions: أسئلة قواعد (MCQ)\n"
@@ -399,7 +399,7 @@ def _get_schema_for_skill_type(skill_type):
   ]
 }''',
 
-   'ESP_PATH': '''
+   'GENERAL_PATH': '''
 {
   "vocabulary_questions": [
     {
@@ -671,7 +671,7 @@ def _save_questions(skill, skill_type, data):
             )
             count += 1
 
-    elif skill_type == 'ESP_PATH':
+    elif skill_type == 'GENERAL_PATH':
         from sabr_questions.models import (
             VocabularyQuestion, VocabularyQuestionSet,
             GrammarQuestion, GrammarQuestionSet,

@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 
 logger = logging.getLogger(__name__)
 
-VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'ESP_PATH']
+VALID_SKILL_TYPES = ['VOCABULARY', 'GRAMMAR', 'READING', 'LISTENING', 'SPEAKING', 'WRITING', 'GENERAL_PATH']
 
 
 # ============================================================
