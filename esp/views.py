@@ -275,7 +275,7 @@ def create_vocabulary_question(request):
 
     try:
         skill = get_object_or_404(EspSkill, id=data.get('esp_skill'))
-        if skill.skill_type != 'VOCABULARY':
+        if skill.skill_type not in ('VOCABULARY', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Vocabulary'}, status=status.HTTP_400_BAD_REQUEST)
 
         options = data.get('options', [])
@@ -335,7 +335,7 @@ def create_grammar_question(request):
 
     try:
         skill = get_object_or_404(EspSkill, id=data.get('esp_skill'))
-        if skill.skill_type != 'GRAMMAR':
+        if skill.skill_type not in ('GRAMMAR', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Grammar'}, status=status.HTTP_400_BAD_REQUEST)
 
         options = data.get('options', [])
@@ -395,7 +395,7 @@ def create_reading_passage(request):
 
     try:
         skill = get_object_or_404(EspSkill, id=data.get('esp_skill'))
-        if skill.skill_type != 'READING':
+        if skill.skill_type not in ('READING', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Reading'}, status=status.HTTP_400_BAD_REQUEST)
 
         passage = ReadingPassage.objects.create(
@@ -490,7 +490,7 @@ def create_listening_audio(request):
     try:
         skill = get_object_or_404(EspSkill, id=data.get('esp_skill'))
         
-        if skill.skill_type != 'LISTENING':
+        if skill.skill_type not in ('LISTENING', 'GENERAL_PATH'):
             return Response(
                 {'error': 'هذه المهارة ليست من نوع Listening'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -590,7 +590,7 @@ def create_speaking_video(request):
 
     try:
         skill = get_object_or_404(EspSkill, id=data.get('esp_skill'))
-        if skill.skill_type != 'SPEAKING':
+        if skill.skill_type not in ('SPEAKING', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Speaking'}, status=status.HTTP_400_BAD_REQUEST)
 
         video = SpeakingVideo.objects.create(
