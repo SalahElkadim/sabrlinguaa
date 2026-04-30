@@ -1151,3 +1151,14 @@ def my_report_pdf(request):
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="my_report.pdf"'
     return response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_teacher_by_code(request, teacher_code):
+    """
+    البحث عن مدرس بالكود
+    GET /booking/teachers/code/{teacher_code}/
+    """
+    teacher = get_object_or_404(Teacher, teacher_code=teacher_code.upper())
+    serializer = TeacherDetailSerializer(teacher)
+    return Response(serializer.data, status=status.HTTP_200_OK)

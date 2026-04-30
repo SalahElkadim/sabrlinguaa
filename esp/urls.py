@@ -105,5 +105,8 @@ urlpatterns = [
     path('ai/jobs/', ai_views.list_generation_jobs, name='list-generation-jobs'),
     path('ai/jobs/<int:job_id>/status/', ai_views.generation_job_status, name='generation-job-status'),
     path('ai/add-questions/', ai_views.add_questions_to_skill, name='esp-ai-add-questions'),
+    path('categories/<int:category_id>/favorite/', views.toggle_favorite_category, name='toggle-favorite'),
+    path('categories/<int:category_id>/favorite/status/', views.check_favorite_status, name='favorite-status'),
+    path('my-favorites/', views.my_favorite_categories, name='my-favorites'),
 
 ]

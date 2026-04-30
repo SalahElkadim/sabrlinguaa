@@ -38,4 +38,5 @@ urlpatterns = [
     path('reports/students/<int:student_id>/', views.student_report_admin, name='student_report_admin'),
     path('reports/me/pdf/',views.my_report_pdf,name='my_report_pdf'),
     path('reports/students/<int:student_id>/pdf/', views.student_report_pdf_admin, name='student_report_pdf_admin'),
+    path('teachers/code/<str:teacher_code>/', views.get_teacher_by_code, name='get-teacher-by-code'),
 ]

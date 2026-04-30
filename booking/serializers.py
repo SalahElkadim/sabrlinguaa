@@ -22,7 +22,7 @@ class TeacherListSerializer(serializers.ModelSerializer):
             'years_of_experience',
             'is_active',
             'bio',
-            'average_rating','reviews_count',
+            'average_rating','reviews_count','teacher_code',  
         ]
 
     def get_profile_picture_url(self, obj):
@@ -42,7 +42,7 @@ class TeacherDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'profile_picture_url', 'subject',
             'years_of_experience', 'bio',
             'is_active', 'created_at', 'updated_at',
-            'average_rating', 'reviews_count',  # ← جديد
+            'average_rating', 'reviews_count', 'teacher_code',   
         ]
 
     def get_profile_picture_url(self, obj):
@@ -176,11 +176,12 @@ class ProgramCreateUpdateSerializer(serializers.ModelSerializer):
 class SubscriptionSerializer(serializers.ModelSerializer):
     program = ProgramListSerializer(read_only=True)
     student_name = serializers.CharField(source='student.full_name', read_only=True)
+    teacher_id = serializers.IntegerField(source='program.teacher.id', read_only=True) 
 
     class Meta:
         model = Subscription
         fields = [
-            'id', 'student_name', 'program',
+            'id', 'student_name', 'program','teacher_id',
             'payment_id', 'payment_status', 'amount', 'created_at','reference_number', 
         ]
 

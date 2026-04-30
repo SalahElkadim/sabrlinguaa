@@ -10,6 +10,12 @@ from django.db.models import Avg
 
 class Teacher(models.Model):
     name = models.CharField(max_length=255, verbose_name="اسم المعلم")
+    teacher_code = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        verbose_name="كود المدرس"
+    )
     profile_picture = CloudinaryField(
         resource_type='image',
         folder='teachers/profiles/',
@@ -33,6 +39,12 @@ class Teacher(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.subject}"
+    def save(self, *args, **kwargs):
+        if not self.teacher_code:
+            super().save(*args, **kwargs)
+            self.teacher_code = f"TCH-{self.id:05d}"
+            kwargs['force_insert'] = False
+        super().save(*args, **kwargs)
 
     @property
     def average_rating(self):
