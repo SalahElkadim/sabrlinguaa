@@ -1746,7 +1746,7 @@ def delete_writing_question(request, question_id):
 from .models import (
     GeneralCategory, GeneralSkill,
     StudentGeneralProgress, StudentGeneralQuestionAttempt,
-    StudentGeneralFavoriteCategory,
+    StudentFavoriteCategory,
 )
 from .serializers import (
     GeneralCategoryListSerializer,
@@ -1754,7 +1754,7 @@ from .serializers import (
     GeneralSkillListSerializer,
     GeneralSkillDetailSerializer,
     StudentGeneralProgressSerializer,
-    StudentGeneralFavoriteCategorySerializer,
+    StudentFavoriteCategorySerializer,
 )
 
 
@@ -1769,7 +1769,7 @@ def toggle_favorite_category(request, category_id):
     category = get_object_or_404(GeneralCategory, id=category_id)
     student = request.user
 
-    favorite, created = StudentGeneralFavoriteCategory.objects.get_or_create(
+    favorite, created = StudentFavoriteCategory.objects.get_or_create(
         student=student,
         category=category
     )
@@ -1796,11 +1796,11 @@ def my_favorite_categories(request):
     GET /api/general/my-favorites/
     عرض كل المفضلة للطالب الحالي
     """
-    favorites = StudentGeneralFavoriteCategory.objects.filter(
+    favorites = StudentFavoriteCategory.objects.filter(
         student=request.user
     ).select_related('category').order_by('-created_at')
 
-    serializer = StudentGeneralFavoriteCategorySerializer(favorites, many=True)
+    serializer = StudentFavoriteCategorySerializer(favorites, many=True)
 
     return Response({
         'total_favorites': favorites.count(),
@@ -1816,7 +1816,7 @@ def check_favorite_status(request, category_id):
     بيتحقق لو الكاتيجوري دي في مفضلة الطالب ولا لأ
     """
     category = get_object_or_404(GeneralCategory, id=category_id)
-    is_favorite = StudentGeneralFavoriteCategory.objects.filter(
+    is_favorite = StudentFavoriteCategory.objects.filter(
         student=request.user,
         category=category
     ).exists()
