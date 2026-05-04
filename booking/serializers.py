@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Teacher, Booking
+from .models import Teacher, Subscription
 
 
 # ============================================
@@ -90,13 +90,15 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         student = self.context['request'].user
         teacher = data['teacher']
 
-        # الطالب لازم يكون عمل حجز مع المدرس ده
-        has_booking = Booking.objects.filter(
-            student=student, teacher=teacher
+        # الطالب لازم يكون مشترك في برنامج للمدرس ده
+        has_subscription = Subscription.objects.filter(
+            student=student,
+            program__teacher=teacher,
+            payment_status=Subscription.PaymentStatus.PAID
         ).exists()
-        if not has_booking:
+        if not has_subscription:
             raise serializers.ValidationError(
-                "لا يمكنك تقييم مدرس لم تحجز معه حصة"
+                "لا يمكنك تقييم مدرس لم تشترك في برنامج معه"
             )
 
         # مينفعش يقيّم أكتر من مرة
