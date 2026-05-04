@@ -275,7 +275,7 @@ def create_vocabulary_question(request):
 
     try:
         skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
-        if skill.skill_type != 'VOCABULARY':
+        if skill.skill_type not in ('VOCABULARY', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Vocabulary'}, status=status.HTTP_400_BAD_REQUEST)
 
         options = data.get('options', [])
@@ -335,7 +335,7 @@ def create_grammar_question(request):
 
     try:
         skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
-        if skill.skill_type != 'GRAMMAR':
+        if skill.skill_type not in ('GRAMMAR', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Grammar'}, status=status.HTTP_400_BAD_REQUEST)
 
         options = data.get('options', [])
@@ -395,7 +395,7 @@ def create_reading_passage(request):
 
     try:
         skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
-        if skill.skill_type != 'READING':
+        if skill.skill_type not in ('READING', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Reading'}, status=status.HTTP_400_BAD_REQUEST)
 
         passage = ReadingPassage.objects.create(
@@ -490,7 +490,7 @@ def create_listening_audio(request):
     try:
         skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
         
-        if skill.skill_type != 'LISTENING':
+        if skill.skill_type not in ('LISTENING', 'GENERAL_PATH'):
             return Response(
                 {'error': 'هذه المهارة ليست من نوع Listening'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -590,7 +590,7 @@ def create_speaking_video(request):
 
     try:
         skill = get_object_or_404(GeneralSkill, id=data.get('general_skill'))
-        if skill.skill_type != 'SPEAKING':
+        if skill.skill_type not in ('SPEAKING', 'GENERAL_PATH'):
             return Response({'error': 'هذه المهارة ليست من نوع Speaking'}, status=status.HTTP_400_BAD_REQUEST)
 
         video = SpeakingVideo.objects.create(
@@ -1746,7 +1746,7 @@ def delete_writing_question(request, question_id):
 from .models import (
     GeneralCategory, GeneralSkill,
     StudentGeneralProgress, StudentGeneralQuestionAttempt,
-    StudentFavoriteCategory,
+    StudentGeneralFavoriteCategory,
 )
 from .serializers import (
     GeneralCategoryListSerializer,
@@ -1754,7 +1754,7 @@ from .serializers import (
     GeneralSkillListSerializer,
     GeneralSkillDetailSerializer,
     StudentGeneralProgressSerializer,
-    StudentFavoriteCategorySerializer,
+    StudentGeneralFavoriteCategorySerializer,
 )
 
 
@@ -1769,7 +1769,7 @@ def toggle_favorite_category(request, category_id):
     category = get_object_or_404(GeneralCategory, id=category_id)
     student = request.user
 
-    favorite, created = StudentFavoriteCategory.objects.get_or_create(
+    favorite, created = StudentGeneralFavoriteCategory.objects.get_or_create(
         student=student,
         category=category
     )
@@ -1796,11 +1796,11 @@ def my_favorite_categories(request):
     GET /api/general/my-favorites/
     عرض كل المفضلة للطالب الحالي
     """
-    favorites = StudentFavoriteCategory.objects.filter(
+    favorites = StudentGeneralFavoriteCategory.objects.filter(
         student=request.user
     ).select_related('category').order_by('-created_at')
 
-    serializer = StudentFavoriteCategorySerializer(favorites, many=True)
+    serializer = StudentGeneralFavoriteCategorySerializer(favorites, many=True)
 
     return Response({
         'total_favorites': favorites.count(),
@@ -1816,7 +1816,7 @@ def check_favorite_status(request, category_id):
     بيتحقق لو الكاتيجوري دي في مفضلة الطالب ولا لأ
     """
     category = get_object_or_404(GeneralCategory, id=category_id)
-    is_favorite = StudentFavoriteCategory.objects.filter(
+    is_favorite = StudentGeneralFavoriteCategory.objects.filter(
         student=request.user,
         category=category
     ).exists()
