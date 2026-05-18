@@ -1271,22 +1271,27 @@ def get_question_attempt_status(request, skill_id, question_type, question_id):
             'next_attempt_points': 20,
         }, status=status.HTTP_200_OK)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def submit_writing_answer(request, question_id):
     """
     POST /api/general/writing/questions/{question_id}/submit/
-    Body: { "student_answer": "..." }
+    Body: { "student_answer": "...", "skill_id": 1 }
     """
     from sabr_questions.models import WritingQuestion
     from placement_test.services.ai_grading import AIGradingService
 
     question = get_object_or_404(WritingQuestion, id=question_id, usage_type='GENERAL')
     student_answer = request.data.get('student_answer', '').strip()
+    skill_id = request.data.get('skill_id')
 
     if not student_answer:
         return Response({'error': 'الإجابة مطلوبة'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not skill_id:
+        return Response({'error': 'skill_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    skill = get_object_or_404(GeneralSkill, id=skill_id)
 
     word_count = len(student_answer.split())
     if word_count < question.min_words:
@@ -1299,6 +1304,25 @@ def submit_writing_answer(request, question_id):
             'error': f'الإجابة طويلة جداً، الحد الأقصى {question.max_words} كلمة',
             'word_count': word_count,
         }, status=status.HTTP_400_BAD_REQUEST)
+
+    # لو السؤال اتحل قبل كده → ارجع رسالة
+    existing_attempt = StudentGeneralQuestionAttempt.objects.filter(
+        student=request.user,
+        question_type='WRITING',
+        question_id=question_id,
+    ).first()
+
+    if existing_attempt and existing_attempt.is_solved:
+        progress, _ = StudentGeneralProgress.objects.get_or_create(
+            student=request.user, skill=skill
+        )
+        return Response({
+            'message': 'هذا السؤال تم حله من قبل',
+            'already_solved': True,
+            'points_earned': existing_attempt.points_earned,
+            'total_score': progress.total_score,
+            'progress_percentage': progress.calculate_progress_percentage(),
+        }, status=status.HTTP_200_OK)
 
     try:
         grading_service = AIGradingService()
@@ -1313,14 +1337,41 @@ def submit_writing_answer(request, question_id):
             pass_threshold=60
         )
 
+        percentage = grading_result.get('percentage', 0)
+        
+        # النقاط = الـ percentage مباشرة (70% → 70 نقطة)
+        points_earned = round(percentage)
+
+        with transaction.atomic():
+            attempt, created = StudentGeneralQuestionAttempt.objects.get_or_create(
+                student=request.user,
+                question_type='WRITING',
+                question_id=question_id,
+                defaults={'skill': skill}
+            )
+
+            attempt.is_solved = True
+            attempt.attempts_count = 1
+            attempt.points_earned = points_earned
+            attempt.solved_at = timezone.now()
+            attempt.save()
+
+            progress, _ = StudentGeneralProgress.objects.get_or_create(
+                student=request.user, skill=skill
+            )
+            progress.add_score(points_earned)
+
         return Response({
             'score': grading_result.get('raw_score', 0),
-            'percentage': grading_result.get('percentage', 0),
+            'percentage': percentage,
+            'points_earned': points_earned,
+            'total_score': progress.total_score,
+            'progress_percentage': progress.calculate_progress_percentage(),
             'feedback': grading_result.get('feedback', ''),
             'strengths': grading_result.get('strengths', []),
             'improvements': grading_result.get('improvements', []),
             'word_count': word_count,
-            'can_mark_as_viewed': True,
+            'already_solved': False,
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
@@ -1329,8 +1380,6 @@ def submit_writing_answer(request, question_id):
             {'error': 'حدث خطأ أثناء تقييم الإجابة، حاول مرة أخرى'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-
 # ============================================
 # 6. STUDENT PROGRESS
 # ============================================
