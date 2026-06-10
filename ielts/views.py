@@ -25,6 +25,7 @@ from .serializers import (
     ListeningAudioIELTSSerializer,
     WritingQuestionIELTSSerializer,
 )
+from .utils import can_solve_question,get_student_solved_count,FREE_QUESTIONS_LIMIT
 
 import logging
 logger = logging.getLogger(__name__)
@@ -1506,7 +1507,16 @@ def submit_writing_answer(request, question_id):
     question = get_object_or_404(WritingQuestion, id=question_id, usage_type='IELTS')
     student_answer = request.data.get('student_answer', '').strip()
     skill_id = request.data.get('skill_id')
-
+    student = request.user
+    if not can_solve_question(student):
+        return Response({
+            'error': 'paywall',
+            'message': 'لقد أكملت الأسئلة المجانية، يرجى الاشتراك للمتابعة',
+            'show_paywall': True,
+            'solved_questions': get_student_solved_count(student),
+            'free_limit': FREE_QUESTIONS_LIMIT,
+        }, status=status.HTTP_402_PAYMENT_REQUIRED)
+    
     if not student_answer:
         return Response({'error': 'الإجابة مطلوبة'}, status=status.HTTP_400_BAD_REQUEST)
     if not skill_id:
@@ -1732,6 +1742,15 @@ def submit_mcq_answer(request, skill_id, question_type, question_id):
                     'progress_percentage': progress.calculate_progress_percentage(),
                     'already_solved': True,
                 }, status=status.HTTP_200_OK)
+            
+            if not can_solve_question(student):
+                return Response({
+                    'error': 'paywall',
+                    'message': 'لقد أكملت الأسئلة المجانية، يرجى الاشتراك للمتابعة',
+                    'show_paywall': True,
+                    'solved_questions': get_student_solved_count(student),
+                    'free_limit': FREE_QUESTIONS_LIMIT,
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
             # زود عداد المحاولات
             attempt.attempts_count += 1
@@ -1875,6 +1894,15 @@ def use_show_answer(request, skill_id, question_type, question_id):
                     'progress_percentage': progress.calculate_progress_percentage(),
                     **answer_data,
                 }, status=status.HTTP_200_OK)
+            
+            if not can_solve_question(student):
+                return Response({
+                    'error': 'paywall',
+                    'message': 'لقد أكملت الأسئلة المجانية، يرجى الاشتراك للمتابعة',
+                    'show_paywall': True,
+                    'solved_questions': get_student_solved_count(student),
+                    'free_limit': FREE_QUESTIONS_LIMIT,
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)
 
             # أول مرة يضغط show answer → 5 نقاط
             attempt.is_solved = True

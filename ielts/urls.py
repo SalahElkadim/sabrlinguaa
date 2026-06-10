@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from . import ai_views
-
+from . import subscription_views
 
 app_name = 'ielts'
 
@@ -85,5 +85,10 @@ urlpatterns = [
     path('ai/generate-skill/', ai_views.generate_skill, name='generate-skill'),
     path('ai/jobs/<int:job_id>/status/', ai_views.generation_job_status, name='generation-job-status'),
     path('ai/add-questions/', ai_views.add_questions_to_skill, name='add-questions-to-skill'),
+    path('subscription/status/',   subscription_views.ielts_subscription_status,  name='ielts-subscription-status'),
+    path('subscription/plans/',    subscription_views.list_ielts_plans,            name='ielts-subscription-plans'),
+    path('subscription/pay/',      subscription_views.initiate_ielts_payment,      name='ielts-subscription-pay'),
+    path('subscription/callback/', subscription_views.ielts_payment_callback,      name='ielts-subscription-callback'),
+    path('subscription/webhook/',  subscription_views.ielts_moyasar_webhook,       name='ielts-subscription-webhook'),
     
 ]

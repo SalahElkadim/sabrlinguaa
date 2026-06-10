@@ -283,6 +283,51 @@ class StudentSTEPQuestionView(TimeStampedModel):
     
     def __str__(self):
         return f"{self.student.email} - {self.question_type} #{self.question_id}"
-    
+
+
+class STEPSubscriptionPlan(models.Model):
+    PLAN_CHOICES = [
+        ('MONTHLY', 'شهر واحد'),
+        ('QUARTERLY', 'ثلاثة أشهر'),
+    ]
+    plan_type = models.CharField(max_length=20, choices=PLAN_CHOICES, unique=True)
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    duration_days = models.PositiveIntegerField()
+    description = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.get_plan_type_display()} - {self.price} ريال"
+
+
+class STEPSubscription(TimeStampedModel):
+    class PaymentStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PAID    = 'paid',    'Paid'
+        FAILED  = 'failed',  'Failed'
+
+    student      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='step_subscriptions')
+    plan         = models.ForeignKey(STEPSubscriptionPlan, on_delete=models.PROTECT)
+    payment_id   = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.PENDING)
+    amount       = models.DecimalField(max_digits=8, decimal_places=2)
+    starts_at    = models.DateTimeField(null=True, blank=True)
+    expires_at   = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.student.email} - {self.plan} - {self.payment_status}"
+
+    @property
+    def is_active(self):
+        from django.utils import timezone
+        return (
+            self.payment_status == self.PaymentStatus.PAID
+            and self.expires_at is not None
+            and self.expires_at > timezone.now()
+        )
+
 # Import AI models عشان يتعمل migrate معاهم
 from .ai_models import ExtractedBook, ExtractedMedia, AIGenerationJob
