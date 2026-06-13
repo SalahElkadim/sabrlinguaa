@@ -2235,3 +2235,7 @@ def delete_speaking_question(request, question_id):
     question = get_object_or_404(SpeakingQuestion, id=question_id)
     question.delete()
     return Response({'message': 'تم حذف السؤال بنجاح', 'question_id': question_id}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def health_check(request):
+    return Response(True)

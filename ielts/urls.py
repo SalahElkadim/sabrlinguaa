@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import ai_views
 from . import subscription_views
+from .views import health_check
 
 app_name = 'ielts'
 
@@ -90,6 +91,8 @@ urlpatterns = [
     path('subscription/pay/',      subscription_views.initiate_ielts_payment,      name='ielts-subscription-pay'),
     path('subscription/callback/', subscription_views.ielts_payment_callback,      name='ielts-subscription-callback'),
     path('subscription/webhook/',  subscription_views.ielts_moyasar_webhook,       name='ielts-subscription-webhook'),
+    path('check/', health_check, name='health_check'),
+
    
     
 ]
