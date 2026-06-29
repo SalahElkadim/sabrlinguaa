@@ -39,7 +39,7 @@ class VocabularyQuestionSerializer(serializers.ModelSerializer):
             'id', 'question_set', 'question_set_title',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'usage_type', 'order', 'is_active',
             'created_at', 'updated_at'
         ]
@@ -57,7 +57,7 @@ class CreateVocabularyQuestionSerializer(serializers.ModelSerializer):
             'question_set_id', 'question_set_title', 'question_set_description',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active'
         ]
 
@@ -92,7 +92,7 @@ class GrammarQuestionSerializer(serializers.ModelSerializer):
             'id', 'question_set', 'question_set_title',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'usage_type', 'order', 'is_active',
             'created_at', 'updated_at'
         ]
@@ -110,7 +110,7 @@ class CreateGrammarQuestionSerializer(serializers.ModelSerializer):
             'question_set_id', 'question_set_title', 'question_set_description',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active'
         ]
 
@@ -127,7 +127,7 @@ class ReadingQuestionSerializer(serializers.ModelSerializer):
             'id', 'passage',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active',
             'created_at', 'updated_at'
         ]
@@ -168,7 +168,7 @@ class CreateReadingQuestionSerializer(serializers.ModelSerializer):
         fields = [
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active'
         ]
 
@@ -185,7 +185,7 @@ class ListeningQuestionSerializer(serializers.ModelSerializer):
             'id', 'audio',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active',
             'created_at', 'updated_at'
         ]
@@ -233,7 +233,7 @@ class CreateListeningQuestionSerializer(serializers.ModelSerializer):
         fields = [
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active'
         ]
 
@@ -250,7 +250,7 @@ class SpeakingQuestionSerializer(serializers.ModelSerializer):
             'id', 'video',
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active',
             'created_at', 'updated_at'
         ]
@@ -304,7 +304,7 @@ class CreateSpeakingQuestionSerializer(serializers.ModelSerializer):
         fields = [
             'question_text', 'question_image',
             'choice_a', 'choice_b', 'choice_c', 'choice_d',
-            'correct_answer', 'explanation', 'points',
+            'correct_answer', 'explanation','english_explanation', 'points',
             'order', 'is_active'
         ]
 

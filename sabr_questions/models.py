@@ -90,6 +90,11 @@ class BaseMCQQuestion(DifficultyMixin, models.Model):
         null=True,
         verbose_name="شرح الإجابة"
     )
+    english_explanation = models.TextField(   # ✅ جديد
+        blank=True,
+        null=True,
+        verbose_name="شرح الإجابة بالإنجليزية"
+    )
     
     points = models.PositiveIntegerField(
         default=1,

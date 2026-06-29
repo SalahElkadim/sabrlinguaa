@@ -206,6 +206,7 @@ def create_vocabulary_question(request):
             choice_d=options[3] if len(options) > 3 else '',
             correct_answer=correct_letter,
             explanation=data.get('explanation', ''),
+            english_explanation=data.get('english_explanation', ''),
             points=data.get('points', 1),
             usage_type='IELTS',
             ielts_skill=skill,
@@ -272,6 +273,7 @@ def create_grammar_question(request):
             choice_d=options[3] if len(options) > 3 else '',
             correct_answer=correct_letter,
             explanation=data.get('explanation', ''),
+            english_explanation=data.get('english_explanation', ''),
             points=data.get('points', 1),
             usage_type='IELTS',
             ielts_skill=skill,
@@ -378,6 +380,7 @@ def create_reading_question(request, passage_id):
             choice_d=options[3] if len(options) > 3 else '',
             correct_answer=correct_letter,
             explanation=data.get('explanation', ''),
+            english_explanation=data.get('english_explanation', ''),
             points=data.get('points', 1),
             is_active=data.get('is_active', True),
             order=0,
@@ -515,6 +518,7 @@ def create_listening_question(request, audio_id):
             choice_d=options[3] if len(options) > 3 else '',
             correct_answer=correct_letter,
             explanation=data.get('explanation', ''),
+            english_explanation=data.get('english_explanation', ''),
             points=data.get('points', 1),
             order=int(data.get('order', 0)),
             is_active=data.get('is_active', True),
@@ -669,7 +673,8 @@ def get_skill_questions(request, skill_id):
                 'choice_a': q.choice_a, 'choice_b': q.choice_b,
                 'choice_c': q.choice_c, 'choice_d': q.choice_d,
                 'correct_answer': q.correct_answer,
-                'explanation': q.explanation, 'points': q.points,
+                'explanation': q.explanation,
+                'english_explanation': q.english_explanation, 'points': q.points,
                 'difficulty': q.difficulty,
                 **get_attempt_data('VOCABULARY', q.id),  # ✅
             })
@@ -687,7 +692,8 @@ def get_skill_questions(request, skill_id):
                 'choice_a': q.choice_a, 'choice_b': q.choice_b,
                 'choice_c': q.choice_c, 'choice_d': q.choice_d,
                 'correct_answer': q.correct_answer,
-                'explanation': q.explanation, 'points': q.points,
+                'explanation': q.explanation,
+                'english_explanation': q.english_explanation, 'points': q.points,
                 'difficulty': q.difficulty,
                 **get_attempt_data('GRAMMAR', q.id),  # ✅
             })
@@ -705,7 +711,8 @@ def get_skill_questions(request, skill_id):
                     'choice_a': q.choice_a, 'choice_b': q.choice_b,
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
-                    'explanation': q.explanation, 'points': q.points,
+                    'explanation': q.explanation,
+                    'english_explanation': q.english_explanation, 'points': q.points,
                     **get_attempt_data('READING', q.id),  # ✅
                 })
             questions_data.append({
@@ -731,7 +738,8 @@ def get_skill_questions(request, skill_id):
                     'choice_a': q.choice_a, 'choice_b': q.choice_b,
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
-                    'explanation': q.explanation, 'points': q.points,
+                    'explanation': q.explanation,
+                    'english_explanation': q.english_explanation, 'points': q.points,
                     **get_attempt_data('LISTENING', q.id),  # ✅
                 })
             questions_data.append({
@@ -756,7 +764,8 @@ def get_skill_questions(request, skill_id):
                     'choice_a': q.choice_a, 'choice_b': q.choice_b,
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
-                    'explanation': q.explanation, 'points': q.points,
+                    'explanation': q.explanation,
+                    'english_explanation': q.english_explanation, 'points': q.points,
                     **get_attempt_data('SPEAKING', q.id),
                 })
             questions_data.append({
@@ -816,7 +825,8 @@ def get_skill_questions(request, skill_id):
                 'choice_a': q.choice_a, 'choice_b': q.choice_b,
                 'choice_c': q.choice_c, 'choice_d': q.choice_d,
                 'correct_answer': q.correct_answer,
-                'explanation': q.explanation, 'points': q.points,
+                'explanation': q.explanation,
+                'english_explanation': q.english_explanation, 'points': q.points,
                 'difficulty': q.difficulty,
                 **get_attempt_data('VOCABULARY', q.id),  # ✅
             })
@@ -833,7 +843,8 @@ def get_skill_questions(request, skill_id):
                 'choice_a': q.choice_a, 'choice_b': q.choice_b,
                 'choice_c': q.choice_c, 'choice_d': q.choice_d,
                 'correct_answer': q.correct_answer,
-                'explanation': q.explanation, 'points': q.points,
+                'explanation': q.explanation,
+                'english_explanation': q.english_explanation, 'points': q.points,
                 'difficulty': q.difficulty,
                 **get_attempt_data('GRAMMAR', q.id),  # ✅
             })
@@ -850,7 +861,8 @@ def get_skill_questions(request, skill_id):
                     'choice_a': q.choice_a, 'choice_b': q.choice_b,
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
-                    'explanation': q.explanation, 'points': q.points,
+                    'explanation': q.explanation,
+                    'english_explanation': q.english_explanation, 'points': q.points,
                     **get_attempt_data('READING', q.id),  # ✅
                 })
             questions_data.append({
@@ -873,7 +885,8 @@ def get_skill_questions(request, skill_id):
                     'choice_a': q.choice_a, 'choice_b': q.choice_b,
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
-                    'explanation': q.explanation, 'points': q.points,
+                    'explanation': q.explanation,
+                    'english_explanation': q.english_explanation, 'points': q.points,
                     **get_attempt_data('SPEAKING', q.id),
                 })
             questions_data.append({
@@ -897,7 +910,8 @@ def get_skill_questions(request, skill_id):
                     'choice_a': q.choice_a, 'choice_b': q.choice_b,
                     'choice_c': q.choice_c, 'choice_d': q.choice_d,
                     'correct_answer': q.correct_answer,
-                    'explanation': q.explanation, 'points': q.points,
+                    'explanation': q.explanation,
+                    'english_explanation': q.english_explanation, 'points': q.points,
                     **get_attempt_data('LISTENING', q.id),  # ✅
                 })
             questions_data.append({
@@ -1132,6 +1146,8 @@ def update_vocabulary_question(request, question_id):
             question.question_text = data['question_text']
         if 'explanation' in data:
             question.explanation = data['explanation']
+        if 'english_explanation' in data:          # ✅ أضف بعد كل explanation
+            question.english_explanation = data['english_explanation']
         if 'points' in data:
             question.points = data['points']
         if 'is_active' in data:
@@ -1192,6 +1208,8 @@ def update_grammar_question(request, question_id):
             question.question_text = data['question_text']
         if 'explanation' in data:
             question.explanation = data['explanation']
+        if 'english_explanation' in data:          # ✅ أضف بعد كل explanation
+            question.english_explanation = data['english_explanation']
         if 'points' in data:
             question.points = data['points']
         if 'is_active' in data:
@@ -1299,6 +1317,8 @@ def update_reading_question(request, question_id):
             question.question_text = data['question_text']
         if 'explanation' in data:
             question.explanation = data['explanation']
+        if 'english_explanation' in data:          # ✅ أضف بعد كل explanation
+            question.english_explanation = data['english_explanation']
         if 'points' in data:
             question.points = data['points']
         if 'is_active' in data:
@@ -1408,6 +1428,8 @@ def update_listening_question(request, question_id):
             question.question_text = data['question_text']
         if 'explanation' in data:
             question.explanation = data['explanation']
+        if 'english_explanation' in data:          # ✅ أضف بعد كل explanation
+            question.english_explanation = data['english_explanation']
         if 'points' in data:
             question.points = data['points']
         if 'is_active' in data:
@@ -1659,6 +1681,7 @@ def _get_correct_answer_text(question_type, question_id):
         'correct_answer_letter': q.correct_answer,
         'correct_answer_text': correct_text,
         'explanation': q.explanation,
+        'english_explanation': q.english_explanation,
     }
 
 
@@ -1811,6 +1834,7 @@ def submit_mcq_answer(request, skill_id, question_type, question_id):
                         'correct_answer_letter': correct_answer,
                         'correct_answer_text': choice_map.get(correct_answer, ''),
                         'explanation': question.explanation,
+                        'english_explanation': question.english_explanation,
                         'max_attempts_reached': True,
                     }, status=status.HTTP_200_OK)
 
@@ -2113,6 +2137,7 @@ def create_speaking_question(request, video_id):
             choice_d=options[3] if len(options) > 3 else '',
             correct_answer=correct_letter,
             explanation=data.get('explanation', ''),
+            english_explanation=data.get('english_explanation', ''),
             points=data.get('points', 1),
             order=int(data.get('order', 0)),
             is_active=data.get('is_active', True),
@@ -2208,6 +2233,8 @@ def update_speaking_question(request, question_id):
             question.question_text = data['question_text']
         if 'explanation' in data:
             question.explanation = data['explanation']
+        if 'english_explanation' in data:          # ✅ أضف بعد كل explanation
+            question.english_explanation = data['english_explanation']
         if 'points' in data:
             question.points = data['points']
         if 'is_active' in data:

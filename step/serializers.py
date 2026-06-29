@@ -132,6 +132,7 @@ class VocabularyQuestionSTEPSerializer(serializers.Serializer):
     choice_d = serializers.CharField()
     correct_answer = serializers.CharField()
     explanation = serializers.CharField(required=False, allow_null=True)
+    english_explanation = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
 
 
@@ -146,6 +147,7 @@ class GrammarQuestionSTEPSerializer(serializers.Serializer):
     choice_d = serializers.CharField()
     correct_answer = serializers.CharField()
     explanation = serializers.CharField(required=False, allow_null=True)
+    english_explanation = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
 
 
@@ -159,6 +161,7 @@ class ReadingQuestionSTEPSerializer(serializers.Serializer):
     choice_d = serializers.CharField()
     correct_answer = serializers.CharField()
     explanation = serializers.CharField(required=False, allow_null=True)
+    english_explanation = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
 
 
@@ -186,6 +189,7 @@ class ListeningQuestionSTEPSerializer(serializers.Serializer):
     choice_d = serializers.CharField()
     correct_answer = serializers.CharField()
     explanation = serializers.CharField(required=False, allow_null=True)
+    english_explanation = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
 
 
@@ -231,6 +235,7 @@ class SpeakingQuestionSTEPSerializer(serializers.Serializer):
     choice_d = serializers.CharField()
     correct_answer = serializers.CharField()
     explanation = serializers.CharField(required=False, allow_null=True)
+    english_explanation = serializers.CharField(required=False, allow_null=True)
     points = serializers.IntegerField()
     difficulty = serializers.CharField(required=False)
 

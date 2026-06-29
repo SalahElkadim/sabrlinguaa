@@ -301,9 +301,10 @@ def _build_prompt(skill_type, content, no_easy, no_medium, no_hard, additional_n
 التعليمات:
 1. استخرج الأسئلة من المحتوى المرجعي المقدم فقط
 2. التزم بتوزيع الصعوبة المطلوب بالضبط
-3. كل الأسئلة يجب أن تكون باللغة الإنجليزية
-4. أرجع JSON فقط بدون أي نص إضافي أو backticks
-5. التزم بالـ schema التالي تماماً:
+3. نص السؤال (question_text) والخيارات (options) والنصوص (passage_text/transcript) يجب أن تكون باللغة الإنجليزية فقط
+4. لكل سؤال MCQ، اكتب شرح الإجابة (explanation) باللغة العربية، وشرح بنفس المعنى باللغة الإنجليزية في (english_explanation)
+5. أرجع JSON فقط بدون أي نص إضافي أو backticks
+6. التزم بالـ schema التالي تماماً:
 
 {schema}"""
 
@@ -317,7 +318,8 @@ def _get_schema_for_skill_type(skill_type):
       "question_text": "Choose the correct meaning of the word 'abundant':",
       "options": ["scarce", "plentiful", "dangerous", "hidden"],
       "correct_answer": "plentiful",
-      "explanation": "Abundant means existing in large quantities.",
+      "explanation": "كلمة Abundant تعني موجود بكثرة أو وفرة.",
+      "english_explanation": "Abundant means existing in large quantities.",
       "difficulty": "EASY"
     }
   ]
@@ -329,7 +331,8 @@ def _get_schema_for_skill_type(skill_type):
       "question_text": "Choose the correct form: She ___ to school every day.",
       "options": ["go", "goes", "going", "gone"],
       "correct_answer": "goes",
-      "explanation": "Third person singular takes 's' in simple present.",
+      "explanation": "في زمن المضارع البسيط يُضاف حرف 's' للفعل مع ضمير الغائب المفرد.",
+      "english_explanation": "Third person singular takes 's' in simple present.",
       "difficulty": "MEDIUM"
     }
   ]
@@ -346,7 +349,8 @@ def _get_schema_for_skill_type(skill_type):
           "question_text": "What is the main idea of the passage?",
           "options": ["option A", "option B", "option C", "option D"],
           "correct_answer": "option A",
-          "explanation": "The passage mainly discusses...",
+          "explanation": "تتحدث القطعة بشكل أساسي عن...",
+          "english_explanation": "The passage mainly discusses...",
           "difficulty": "MEDIUM"
         }
       ]
@@ -365,7 +369,8 @@ def _get_schema_for_skill_type(skill_type):
           "question_text": "Where does the conversation take place?",
           "options": ["At a hotel", "At the airport", "At a bank", "At a school"],
           "correct_answer": "At the airport",
-          "explanation": "The agent asks for a passport, indicating an airport setting.",
+          "explanation": "طلب الموظف رؤية جواز السفر، وهذا يدل على أن الحوار يدور في المطار.",
+          "english_explanation": "The agent asks for a passport, indicating an airport setting.",
           "difficulty": "EASY"
         }
       ]
@@ -384,7 +389,8 @@ def _get_schema_for_skill_type(skill_type):
           "question_text": "What time does Sarah wake up?",
           "options": ["6am", "7am", "8am", "9am"],
           "correct_answer": "7am",
-          "explanation": "Sarah clearly states she wakes up at 7am.",
+          "explanation": "ذكرت سارة بوضوح أنها تستيقظ في الساعة السابعة صباحاً.",
+          "english_explanation": "Sarah clearly states she wakes up at 7am.",
           "difficulty": "EASY"
         }
       ]
@@ -413,7 +419,9 @@ def _get_schema_for_skill_type(skill_type):
       "question_text": "Choose the correct meaning of 'resilient':",
       "options": ["weak", "adaptable", "careless", "loud"],
       "correct_answer": "adaptable",
-      "explanation": "Resilient means able to recover quickly from difficulties.",
+      "explanation": "كلمة Resilient تعني القدرة على التعافي بسرعة من الصعوبات.",
+      "english_explanation": "Resilient means able to recover quickly from difficulties.",
+      "difficulty": "MEDIUM"
       "difficulty": "MEDIUM"
     }
   ],
@@ -422,7 +430,8 @@ def _get_schema_for_skill_type(skill_type):
       "question_text": "Choose the correct form: By next year, she ___ her degree.",
       "options": ["will complete", "will have completed", "completes", "completed"],
       "correct_answer": "will have completed",
-      "explanation": "Future perfect is used for actions completed before a future point.",
+      "explanation": "يُستخدم Future Perfect للأفعال التي تنتهي قبل نقطة زمنية مستقبلية محددة.",
+      "english_explanation": "Future perfect is used for actions completed before a future point.",
       "difficulty": "HARD"
     }
   ],
@@ -436,7 +445,8 @@ def _get_schema_for_skill_type(skill_type):
           "question_text": "What is the main argument of the passage?",
           "options": ["Technology harms education", "Technology improves learning", "Students dislike technology", "Schools ban technology"],
           "correct_answer": "Technology improves learning",
-          "explanation": "The passage discusses positive impacts of technology.",
+          "explanation": "تتناول القطعة الآثار الإيجابية للتكنولوجيا على التعليم.",
+          "english_explanation": "The passage discusses positive impacts of technology.",
           "difficulty": "MEDIUM"
         }
       ]
@@ -452,7 +462,8 @@ def _get_schema_for_skill_type(skill_type):
           "question_text": "Where does person B want to travel?",
           "options": ["China", "Japan", "Korea", "Thailand"],
           "correct_answer": "Japan",
-          "explanation": "Person B clearly states they want to visit Japan.",
+          "explanation": "صرّح الشخص B بوضوح أنه يريد زيارة اليابان.",
+          "english_explanation": "Person B clearly states they want to visit Japan.",
           "difficulty": "EASY"
         }
       ]
@@ -468,7 +479,8 @@ def _get_schema_for_skill_type(skill_type):
           "question_text": "What city does the speaker talk about?",
           "options": ["Alexandria", "Cairo", "Luxor", "Aswan"],
           "correct_answer": "Cairo",
-          "explanation": "The speaker explicitly mentions Cairo as their hometown.",
+          "explanation": "يذكر المتحدث بشكل صريح أن القاهرة هي مسقط رأسه.",
+          "english_explanation": "The speaker explicitly mentions Cairo as their hometown.",
           "difficulty": "EASY"
         }
       ]
@@ -533,6 +545,7 @@ def _save_questions(skill, skill_type, data):
                 choice_d=options[3] if len(options) > 3 else '',
                 correct_answer=correct_letter,
                 explanation=q.get('explanation', ''),
+                english_explanation=q.get('english_explanation', ''),
                 points=1,
                 usage_type='STEP',
                 step_skill=skill,
@@ -575,6 +588,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     is_active=True,
                     order=0,
@@ -612,6 +626,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     is_active=True,
                     order=0,
@@ -648,6 +663,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     is_active=True,
                     order=0,
@@ -706,6 +722,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     usage_type='STEP',
                     step_skill=skill,
@@ -736,6 +753,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     usage_type='STEP',
                     step_skill=skill,
@@ -770,6 +788,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     is_active=True,
                     order=0,
@@ -804,6 +823,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     is_active=True,
                     order=0,
@@ -837,6 +857,7 @@ def _save_questions(skill, skill_type, data):
                     choice_d=options[3] if len(options) > 3 else '',
                     correct_answer=correct_letter,
                     explanation=q.get('explanation', ''),
+                    english_explanation=q.get('english_explanation', ''),
                     points=1,
                     is_active=True,
                     order=0,
