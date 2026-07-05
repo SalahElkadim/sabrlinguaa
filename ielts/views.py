@@ -2265,4 +2265,4 @@ def delete_speaking_question(request, question_id):
 
 @api_view(['GET'])
 def health_check(request):
-    return Response(False)
+    return Response(True)
