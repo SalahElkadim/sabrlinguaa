@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from django.core.paginator import Paginator
 from django.db.models import Case, When, IntegerField, Value
 import math
@@ -1875,3 +1875,8 @@ def check_favorite_status(request, category_id):
         'category_id': category_id,
         'is_favorite': is_favorite,
     }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def under_development(request):
+    return Response(status=status.HTTP_204_NO_CONTENT) 

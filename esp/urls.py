@@ -108,5 +108,7 @@ urlpatterns = [
     path('categories/<int:category_id>/favorite/', views.toggle_favorite_category, name='toggle-favorite'),
     path('categories/<int:category_id>/favorite/status/', views.check_favorite_status, name='favorite-status'),
     path('my-favorites/', views.my_favorite_categories, name='my-favorites'),
+    path('under-development/', views.under_development, name='under-development'),
+
 
 ]
