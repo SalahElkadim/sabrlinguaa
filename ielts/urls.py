@@ -92,6 +92,7 @@ urlpatterns = [
     path('subscription/callback/', subscription_views.ielts_payment_callback,      name='ielts-subscription-callback'),
     path('subscription/webhook/',  subscription_views.ielts_moyasar_webhook,       name='ielts-subscription-webhook'),
     path('check/', health_check, name='health_check'),
+    path('under-development/', views.under_development, name='under-development'),
 
    
     
