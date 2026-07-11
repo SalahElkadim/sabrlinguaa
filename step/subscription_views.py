@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
-
+from rest_framework.permissions import AllowAny
 from .models import STEPSubscriptionPlan, STEPSubscription
 from .utils import get_student_solved_count, has_active_step_subscription, FREE_QUESTIONS_LIMIT
 from booking.moyasar_service import create_payment, get_payment, verify_webhook_signature
@@ -154,9 +154,9 @@ def initiate_step_payment(request):
 def step_payment_callback(request):
     """
     GET/POST /api/step/subscription/callback/
-    Moyasar بيعمل redirect هنا بعد 3DS
+    Moyasar بيعمل redirect هنا بعد 3DS، وصفحة StepPaymentCallback.jsx
+    بتنادي الـ endpoint ده بالـ JWT بتاع الطالب
     """
-    from rest_framework.permissions import AllowAny
     payment_id = (
         request.data.get('id') or
         request.query_params.get('id')
@@ -173,45 +173,55 @@ def step_payment_callback(request):
 
     payment_status = payment_data.get('status')
     metadata       = payment_data.get('metadata') or {}
-    plan_id        = metadata.get('plan_id')
+
+    # fallback: من الـ metadata، وإلا من جسم الطلب اللي بعتته StepPaymentCallback.jsx
+    plan_id = metadata.get('plan_id') or request.data.get('plan_id')
 
     subscription = STEPSubscription.objects.filter(payment_id=payment_id).first()
 
-    if not subscription and plan_id:
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        student_id = metadata.get('student_id')
+    if not subscription:
+        if not plan_id:
+            return Response({'error': 'plan_id مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
         plan = get_object_or_404(STEPSubscriptionPlan, id=plan_id)
-        student = get_object_or_404(User, id=student_id)
-        amount = payment_data.get('amount', 0) / 100
+
+        student_id = metadata.get('student_id')
+        if student_id:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            student = get_object_or_404(User, id=student_id)
+        elif request.user.is_authenticated:
+            student = request.user
+        else:
+            return Response({'error': 'تعذر تحديد الطالب'}, status=status.HTTP_400_BAD_REQUEST)
+
         subscription = STEPSubscription.objects.create(
             student=student,
             plan=plan,
             payment_id=payment_id,
             payment_status='pending',
-            amount=amount,
+            amount=plan.price,
         )
 
-    if subscription and payment_status == 'paid' and subscription.payment_status != 'paid':
+    if payment_status == 'paid' and subscription.payment_status != 'paid':
         _activate_subscription(subscription, subscription.plan)
-    elif subscription and payment_status != 'paid':
+    elif payment_status != 'paid':
         subscription.payment_status = 'failed'
         subscription.save()
 
     return Response({
         'status': payment_status,
-        'subscription_id': subscription.id if subscription else None,
-        'is_active': subscription.is_active if subscription else False,
+        'subscription_id': subscription.id,
+        'is_active': subscription.is_active,
     }, status=status.HTTP_200_OK)
-
 
 @csrf_exempt
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def step_moyasar_webhook(request):
     """
     POST /api/step/subscription/webhook/
     """
-    from rest_framework.permissions import AllowAny
     signature = request.headers.get('X-Moyasar-Signature', '')
     if not verify_webhook_signature(request.body, signature):
         return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
