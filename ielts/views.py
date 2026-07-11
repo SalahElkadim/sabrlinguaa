@@ -2270,7 +2270,4 @@ def health_check(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def under_development(request):
-    return Response(
-        {'message': 'هذا القسم لا يزال قيد التطوير.'},
-        status=status.HTTP_200_OK
-    )
+    return Response(True)

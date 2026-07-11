@@ -1879,4 +1879,4 @@ def check_favorite_status(request, category_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def under_development(request):
-    return Response(status=status.HTTP_204_NO_CONTENT) 
+    return Response(False)
