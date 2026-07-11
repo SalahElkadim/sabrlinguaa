@@ -11,10 +11,11 @@ User = get_user_model()
 
 # ============================================
 # STEP Skill Serializers
-# ============================================
+
 class STEPSkillListSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
-    child_skills = serializers.SerializerMethodField()  # ← جديد
+    child_skills = serializers.SerializerMethodField()
+    current_question = serializers.SerializerMethodField()  # ← جديد
 
     class Meta:
         model = STEPSkill
@@ -26,7 +27,8 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
             'icon',
             'order',
             'total_questions',
-            'child_skills',  # ← جديد
+            'child_skills',
+            'current_question',  # ← جديد
             'is_active',
             'question_order_type', 
         ]
@@ -34,38 +36,79 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
     def get_total_questions(self, obj):
         return obj.get_total_questions_count()
 
-    # ← جديد
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
             children = obj.child_skills.filter().order_by('order')
-            return STEPSkillListSerializer(children, many=True).data
+            # ← لازم نبعت الـ context هنا كمان عشان الأولاد ياخدوا current_question صح
+            return STEPSkillListSerializer(children, many=True, context=self.context).data
         return None
+
+    # ← الميثود الجديدة (نفسها بالظبط اللي في الـ Detail)
+    def get_current_question(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return 1
+
+        student = request.user
+
+        if obj.skill_type == 'GENERAL_PATH':
+            child_skills = obj.child_skills.filter(is_active=True)
+            total_viewed = StudentSTEPProgress.objects.filter(
+                student=student, skill__in=child_skills
+            ).values_list('viewed_questions_count', flat=True)
+            return sum(total_viewed) + 1
+
+        try:
+            progress = StudentSTEPProgress.objects.get(student=student, skill=obj)
+            return progress.viewed_questions_count + 1
+        except StudentSTEPProgress.DoesNotExist:
+            return 1
 
 class STEPSkillDetailSerializer(serializers.ModelSerializer):
     total_questions = serializers.SerializerMethodField()
-    child_skills = serializers.SerializerMethodField()  # ← جديد
+    child_skills = serializers.SerializerMethodField()
+    current_question = serializers.SerializerMethodField()  # ← السطر الجديد
 
     class Meta:
         model = STEPSkill
         fields = [
             'id', 'skill_type', 'title', 'description',
             'icon', 'order', 'is_active', 'total_questions',
-            'child_skills',  # ← جديد
-            'created_at', 'updated_at','question_order_type', 
+            'child_skills',
+            'current_question',  # ← ضفناه هنا في الليستة
+            'created_at', 'updated_at', 'question_order_type',
         ]
         read_only_fields = ['created_at', 'updated_at']
 
     def get_total_questions(self, obj):
         return obj.get_total_questions_count()
 
-    # ← جديد
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
             children = obj.child_skills.filter().order_by('order')
             return STEPSkillListSerializer(children, many=True).data
         return None
 
+    # ← الميثود الجديدة كلها
+    def get_current_question(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return 1
 
+        student = request.user
+
+        if obj.skill_type == 'GENERAL_PATH':
+            child_skills = obj.child_skills.filter(is_active=True)
+            total_viewed = StudentSTEPProgress.objects.filter(
+                student=student, skill__in=child_skills
+            ).values_list('viewed_questions_count', flat=True)
+            return sum(total_viewed) + 1
+
+        try:
+            progress = StudentSTEPProgress.objects.get(student=student, skill=obj)
+            return progress.viewed_questions_count + 1
+        except StudentSTEPProgress.DoesNotExist:
+            return 1
 # ============================================
 # Student Progress Serializers
 # ============================================

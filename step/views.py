@@ -44,11 +44,12 @@ def list_skills(request):
     else:
         skills = STEPSkill.objects.all().order_by('order')
     
-    serializer = STEPSkillListSerializer(skills, many=True)
+    serializer = STEPSkillListSerializer(skills, many=True, context={'request': request})  # ← ضفنا context
     return Response({
         'total_skills': skills.count(),
         'skills': serializer.data
     }, status=status.HTTP_200_OK)
+
 
 def _get_ordered_questions(queryset, order_type):
     """
@@ -98,7 +99,7 @@ def get_skill(request, skill_id):
     GET /api/step/skills/{skill_id}/
     """
     skill = get_object_or_404(STEPSkill, id=skill_id)
-    serializer = STEPSkillDetailSerializer(skill)
+    serializer = STEPSkillDetailSerializer(skill, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -114,7 +115,7 @@ def create_skill(request):
     skill = serializer.save()
     return Response({
         'message': 'تم إنشاء المهارة بنجاح',
-        'skill': STEPSkillDetailSerializer(skill).data
+        'skill': STEPSkillDetailSerializer(skill, context={'request': request}).data
     }, status=status.HTTP_201_CREATED)
 
 
