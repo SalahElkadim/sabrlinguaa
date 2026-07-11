@@ -555,8 +555,7 @@ def moyasar_webhook(request):
     """
     # التحقق من الـ signature
     signature = request.headers.get('X-Moyasar-Signature', '')
-    if not verify_webhook_signature(request.body, signature):
-        logger.warning("Moyasar webhook: invalid signature")
+    if not verify_webhook_signature(request.body, signature, settings.MOYASAR_WEBHOOK_SECRET_BOOKING):
         return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
 
     event = request.data

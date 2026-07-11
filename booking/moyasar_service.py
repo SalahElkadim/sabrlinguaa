@@ -51,15 +51,12 @@ def get_payment(payment_id: str) -> dict:
     return response.json()
 
 
-def verify_webhook_signature(payload: bytes, signature: str) -> bool:
-    """
-    التحقق من صحة الـ webhook القادم من Moyasar
-    """
-    if not signature or not hasattr(settings, 'MOYASAR_WEBHOOK_SECRET'):
-        return True
+def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
+    if not signature or not secret:
+        return True  # أو False لو عايز تكون صارم أكتر أمنياً — شوف الملاحظة تحت
 
     expected = hmac.HMAC(
-        key=settings.MOYASAR_WEBHOOK_SECRET.encode(),
+        key=secret.encode(),
         msg=payload,
         digestmod=hashlib.sha256,
     ).hexdigest()

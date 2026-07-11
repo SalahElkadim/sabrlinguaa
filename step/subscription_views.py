@@ -223,7 +223,7 @@ def step_moyasar_webhook(request):
     POST /api/step/subscription/webhook/
     """
     signature = request.headers.get('X-Moyasar-Signature', '')
-    if not verify_webhook_signature(request.body, signature):
+    if not verify_webhook_signature(request.body, signature, settings.MOYASAR_WEBHOOK_SECRET_STEP):
         return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
 
     event        = request.data
