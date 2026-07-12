@@ -51,13 +51,6 @@ class STEPSkillListSerializer(serializers.ModelSerializer):
 
         student = request.user
 
-        if obj.skill_type == 'GENERAL_PATH':
-            child_skills = obj.child_skills.filter(is_active=True)
-            total_viewed = StudentSTEPProgress.objects.filter(
-                student=student, skill__in=child_skills
-            ).values_list('viewed_questions_count', flat=True)
-            return sum(total_viewed) + 1
-
         try:
             progress = StudentSTEPProgress.objects.get(student=student, skill=obj)
             return progress.viewed_questions_count + 1
@@ -86,7 +79,7 @@ class STEPSkillDetailSerializer(serializers.ModelSerializer):
     def get_child_skills(self, obj):
         if obj.skill_type == 'GENERAL_PATH':
             children = obj.child_skills.filter().order_by('order')
-            return STEPSkillListSerializer(children, many=True).data
+            return STEPSkillListSerializer(children, many=True, context=self.context).data
         return None
 
     # ← الميثود الجديدة كلها
@@ -96,13 +89,6 @@ class STEPSkillDetailSerializer(serializers.ModelSerializer):
             return 1
 
         student = request.user
-
-        if obj.skill_type == 'GENERAL_PATH':
-            child_skills = obj.child_skills.filter(is_active=True)
-            total_viewed = StudentSTEPProgress.objects.filter(
-                student=student, skill__in=child_skills
-            ).values_list('viewed_questions_count', flat=True)
-            return sum(total_viewed) + 1
 
         try:
             progress = StudentSTEPProgress.objects.get(student=student, skill=obj)
