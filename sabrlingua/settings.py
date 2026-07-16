@@ -147,7 +147,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    os.getenv('FRONTEND_URL', 'https://sabrlinguafront-production.up.railway.app'),
+    os.getenv('FRONTEND_URL','https://admin.sabrlingua.com' ),
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -273,8 +273,8 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://sabrlinguaa-production.up.railway.app',
-    'https://*.railway.app',  # للسماح بكل subdomains
+    'https://api.sabrlingua.com',
+    'https://admin.sabrlingua.com',
 ]
 
 # Celery
