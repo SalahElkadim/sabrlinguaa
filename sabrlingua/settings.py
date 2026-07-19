@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     'general',
     'esp',
     'django_celery_results',
-    
+    'app_version',    
 
 ]
 

@@ -25,7 +25,7 @@ urlpatterns = [
     path('esp/', include('esp.urls')),
     path('general/', include('general.urls', namespace='general')),
     path('.well-known/apple-developer-merchantid-domain-association',apple_pay_domain_association),
-
+    path('api/', include('app_version.urls')),
 
 
 
